@@ -1,180 +1,146 @@
-# Dayweave
+﻿# Dayweave
 
-> **DAYWEAVE — A calm workspace for turning scattered thoughts into a realistic plan for the day.**
+Dayweave is a calm daily planning workspace for turning scattered thoughts into a realistic plan, then giving one task focused attention.
 
-[![React](https://img.shields.io/badge/React-19-20232A?logo=react&logoColor=61DAFB)](https://react.dev/) [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vite.dev/) [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/) [![Playwright](https://img.shields.io/badge/Playwright-1.62-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/) [![axe--core](https://img.shields.io/badge/axe--core-4.13-6B4FBB)](https://github.com/dequelabs/axe-core) [![License: MIT](https://img.shields.io/badge/License-MIT-F4B942.svg)](#license)
+## Live demo
 
-|               |                                 |
-| ------------- | ------------------------------- |
-| **Live Demo** | Not specified in the repository |
-| **GitHub**    | `YOUR_REPOSITORY_URL`           |
+- **Production:** [dayweave-app.vercel.app](https://dayweave-app.vercel.app)
+- **Repository:** [github.com/Athul129/Dayweave](https://github.com/Athul129/Dayweave)
 
-## Overview
+## Features
 
-Dayweave is a calm daily planning workspace for turning a full mind into a day with shape. It starts with a daily intention, gives loose thoughts somewhere to land, and helps users turn those thoughts into tasks with a realistic time and energy profile.
+- **Supabase authentication:** Email/password sign-up, email confirmation handling, session restoration, and sign-out.
+- **Today:** Create, edit, complete, defer, and delete tasks organized by Morning, Midday, and Afternoon.
+- **This week:** Review Monday–Sunday planning, progress, task counts, and tasks across calendar dates.
+- **Loose Notes:** Create, edit, search, and delete notes by title or body.
+- **Daily Intention:** Store one intention per authenticated user and local calendar date.
+- **Focus Mode:** Work on one task in a focused full-screen view with pause, resume, completion, and five-minute continuation.
+- **Responsive UI:** Desktop sidebar navigation, mobile navigation, responsive weekly surfaces, and compact mobile account controls.
 
-It is deliberately more than a conventional to-do list. Dayweave combines daily planning, Monday–Sunday weekly planning, a quiet notebook for non-task thoughts, and a focused execution surface. Its **Quiet Cartography** identity treats the day as a route: editorial wayfinding, paper-like surfaces, route cues, and measured spacing help users decide what belongs now.
+## Tech stack
 
-## The Problem
+| Area | Technologies |
+| --- | --- |
+| Frontend | React 19, TypeScript 5.6, Vite 7, Wouter |
+| Styling | Tailwind CSS 4, project CSS, `tw-animate-css` |
+| UI | Lucide React, Radix UI primitives, Sonner |
+| Backend/runtime | Express 4 production static server, esbuild |
+| Data and auth | Supabase JS 2.116, Supabase Auth, PostgreSQL |
+| Testing | Playwright 1.62, `@axe-core/playwright` 4.13, Vitest 2.1 (installed) |
+| Tooling | pnpm, TypeScript, Prettier |
 
-Traditional task lists can become overwhelming because they show everything without helping users decide what realistically belongs in the current day. Dayweave reduces that pressure by connecting intention, time, energy, and attention in one small planning loop.
+## Supabase architecture and persistence
 
-## The Idea
+The browser uses the configured Supabase client in `client/src/lib/supabase.ts`. `AuthContext` restores the Supabase session and exposes `user`, `userId`, sign-in, sign-up, and sign-out operations.
 
-```text
-Scattered thoughts → realistic tasks → structured day → focused execution
-```
+Authenticated application data is persisted directly from the client through repository modules:
 
-## Core Features
+| Area | Table | Scope |
+| --- | --- | --- |
+| Tasks | `public.tasks` | Rows are owned by `user_id`; task UUIDs come from PostgreSQL. |
+| Notes | `public.notes` | Rows are owned by `user_id`; note UUIDs come from PostgreSQL. |
+| Daily intentions | `public.daily_intentions` | One row per `user_id` and local calendar `date`. |
 
-### Today
+Reads and writes pass the authenticated user ID, while PostgreSQL Row Level Security remains the data-access boundary. The application does not use a service-role key or a separate application API for these operations.
 
-Today is the daily planning surface. Users can set a daily intention, capture a brain dump, and shape tasks into **Morning**, **Midday**, or **Afternoon** sections. Each task can carry a time, estimated duration, and energy level: **Deep**, **Light**, or **Social**.
+Focus Session state is separate from Supabase. The current session is persisted in browser `localStorage` under `dayweave-focus-session`.
 
-Tasks support editing, deletion with confirmation, completion and uncompletion, **Move Later**, **Up Next**, Focus Mode entry, progress tracking, and local browser persistence.
+## Security
 
-### This Week
+Supabase Auth identifies the current user. RLS policies on the application tables restrict access to rows whose `user_id` matches `auth.uid()`. The client only uses the browser-safe publishable key; no secret or service-role key belongs in frontend environment variables.
 
-The weekly view presents the current week from Monday through Sunday. It highlights the current day and shows task counts, completed counts, planned duration, and weekly progress. Tasks can be created, edited, deleted, completed, and moved between real calendar dates while remaining synchronized with Today.
+## Focus Mode timing
 
-### Loose Notes
+The countdown is timestamp-based. A session stores `startAt` and `endAt`; active remaining time is derived from `endAt - Date.now()`. A one-second interval only refreshes the display. Pausing stores the current remaining duration, and resuming reconstructs a new `startAt`/`endAt` pair. Because elapsed time comes from the wall clock, background-tab throttling does not act as an implicit pause.
 
-Loose Notes is a quiet shelf for thoughts that are not tasks yet. Users can create, read, edit, delete, and search notes by title or body. The workspace includes intentional empty and no-results states, with notes persisted locally in the browser.
-
-### Focus Mode
-
-Focus Mode provides an immersive full-viewport execution space for one task. It includes task context, a duration-based countdown, pause/resume, task completion, a five-minute continuation option, exit confirmation, persisted session state, keyboard controls, focus trapping, and accessible timer/status feedback.
-
-## Design
-
-Dayweave uses **Quiet Cartography** rather than a generic productivity-dashboard aesthetic. Editorial wayfinding, warm paper-like surfaces, a marigold accent, route-line cues, calm typography, deliberate spacing, and tactile composition give the interface the feeling of a field guide arranged on a desk.
-
-The layout adapts across desktop, tablet, and mobile without losing the route metaphor or the hierarchy of the current day.
-
-## Technical Highlights
-
-- React and TypeScript component architecture with reusable task, note, weekly, and Focus Mode surfaces.
-- Vite-powered frontend development and production builds.
-- LocalStorage-backed, local-first persistence for tasks, notes, and active Focus Mode sessions.
-- Shared task state across Today and This week rather than disconnected copies.
-- Date-only task representation using `YYYY-MM-DD` and dynamic Monday–Sunday week calculation.
-- Safe migration of legacy demonstration dates and existing tasks without silently deleting user data.
-- Persisted Focus Mode session state with elapsed-time restoration.
-- Responsive mobile, tablet, and desktop behavior.
-- Accessible dialogs, live status feedback, keyboard interactions, and focus management.
-- An error boundary and structured UI components for resilient rendering.
-
-## Tech Stack
-
-| Area               | Technologies                                                                    |
-| ------------------ | ------------------------------------------------------------------------------- |
-| **Frontend**       | React 19, TypeScript, Tailwind CSS 4, Vite, Lucide React, Framer Motion, Wouter |
-| **UI / Utilities** | Radix UI primitives, React Hook Form, Zod, Sonner                               |
-| **Testing**        | Playwright 1.62.0, axe-core 4.13.0, `@axe-core/playwright`                      |
-| **Tooling**        | pnpm, TypeScript, Prettier, esbuild                                             |
-
-## Accessibility
-
-The project includes an axe-core accessibility audit and keyboard-accessible interaction coverage. The verified audit covers Today, This week, Loose Notes, task dialogs, note dialogs, Focus Mode, Focus Mode exit confirmation, empty task and notes states, and key mobile states.
-
-- 8 accessibility audits passed.
-- 6 existing Playwright journeys passed.
-- 14 combined Playwright tests passed.
-- TypeScript check passed.
-- Production build passed.
-- No application runtime console errors were detected.
-- No axe-core violations were intentionally left unresolved.
-
-These results describe the project’s current automated checks; they are not a claim of WCAG certification.
-
-## Testing
-
-The automated suite covers Today task CRUD and progress, This Week planning and persistence, Loose Notes CRUD and search, Focus Mode timer controls and completion, browser persistence, validation, empty states, no-results states, and the no-task Focus Mode experience.
-
-```bash
-pnpm run check
-pnpm run build
-pnpm run test:e2e
-pnpm run test:a11y
-```
-
-## Responsive Design
-
-Dayweave supports desktop, tablet, and mobile layouts. The weekly view reflows into readable day surfaces on smaller screens, while mobile navigation keeps Today, This week, and Loose notes reachable when the desktop rail is hidden.
-
-## Project Structure
+## Project structure
 
 ```text
 dayweave/
 ├── client/
-│   ├── src/
-│   │   ├── components/
-│   │   ├── contexts/
-│   │   ├── hooks/
-│   │   ├── lib/
-│   │   └── pages/
 │   ├── index.html
-│   └── ...
-├── server/
-├── shared/
-├── tests/
-│   └── e2e/
+│   └── src/
+│       ├── components/       # Auth screen, account control, shared UI
+│       ├── contexts/         # Auth and theme context
+│       ├── hooks/            # Small reusable hooks
+│       ├── lib/              # Supabase client and task/note/intention repositories
+│       ├── pages/            # Home and not-found pages
+│       ├── App.tsx
+│       ├── index.css
+│       └── main.tsx
+├── server/                  # Express server for the production static bundle
+├── shared/                  # Shared constants
+├── tests/e2e/               # Playwright browser journeys and accessibility tests
 ├── package.json
 ├── playwright.config.ts
-├── vite.config.ts
-└── tsconfig.json
+├── tsconfig.json
+└── vite.config.ts
 ```
 
-## Getting Started
+## Environment variables
+
+Create a local `.env.local` file with the public frontend Supabase values:
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
+
+Do not commit `.env.local`, credentials, or a Supabase service-role key. The source also contains optional Vite integrations for analytics, OAuth/hosted services, and map features; configure those only when using the corresponding integrations.
+
+## Local development
 
 ```bash
-git clone YOUR_REPOSITORY_URL
-cd dayweave
+git clone https://github.com/Athul129/Dayweave.git
+cd Dayweave
 pnpm install
+```
+
+Add `.env.local`, then start the Vite development server:
+
+```bash
 pnpm run dev
 ```
 
-For a production build:
+For a production build and local production server:
 
 ```bash
 pnpm run build
-pnpm start
+pnpm run start
 ```
 
-## Available Scripts
+## Available scripts
 
-| Command              | Purpose                                               |
-| -------------------- | ----------------------------------------------------- |
-| `pnpm run dev`       | Start the Vite development server.                    |
-| `pnpm run build`     | Build the frontend and bundle the server entry point. |
-| `pnpm run start`     | Start the production build.                           |
-| `pnpm run preview`   | Preview the built frontend.                           |
-| `pnpm run check`     | Run the TypeScript compiler without emitting files.   |
-| `pnpm run test:e2e`  | Run the Playwright end-to-end suite.                  |
-| `pnpm run test:a11y` | Run the axe-core accessibility suite.                 |
-| `pnpm run format`    | Format project files with Prettier.                   |
+| Command | Purpose |
+| --- | --- |
+| `pnpm run dev` | Start Vite in development mode. |
+| `pnpm run build` | Build the frontend and bundle `server/index.ts` into `dist`. |
+| `pnpm run start` | Start the bundled Express production server. |
+| `pnpm run preview` | Preview the Vite production frontend. |
+| `pnpm run check` | Run `tsc --noEmit`. |
+| `pnpm run test:e2e` | Run the Playwright suite from `tests/e2e`. |
+| `pnpm run test:a11y` | Run the configured accessibility Playwright command. |
+| `pnpm run format` | Format project files with Prettier. |
 
-## Future Direction
+## Testing and validation
 
-Possible future ideas include account-based synchronization, cross-device persistence, smarter planning assistance, previous/next week navigation, and optional cloud sync. These are not implemented features in the current project.
+Playwright configuration uses Chromium at `/usr/bin/chromium`, a Vite web server on port 4173, and tests under `tests/e2e`. The repository includes journeys for authentication, task workflows, notes, persistence, Focus Mode, responsive behavior, and accessibility. Browser execution depends on the configured Chromium executable and the required environment/session setup.
 
-## Portfolio Note
+TypeScript validation and the production build can be run independently with `pnpm run check` and `pnpm run build`.
 
-Dayweave demonstrates product thinking through a focused planning model, UX-oriented frontend development, shared state management, local persistence, responsive composition, accessibility work, automated browser testing, and attention to small interaction details.
+## Deployment
 
-## License
+The published deployment is available at [dayweave-app.vercel.app](https://dayweave-app.vercel.app). The repository contains Vite and Express build configuration; no Vercel-specific configuration file is present in the project, so deployment environment variables and build settings must be supplied by the hosting project.
 
-MIT
+## Current capabilities
+
+Dayweave currently provides authenticated, user-scoped task, note, and daily-intention persistence through Supabase; responsive planning views; and a local, timestamp-based Focus Session. Tasks, notes, and intentions are not maintained as competing localStorage sources.
+
+## Future improvements
+
+Potential follow-up work includes Focus Session history, recurring tasks, reminders, weekly productivity insights, and richer task search/filtering. These are not currently implemented features.
 
 ## Author
 
-**Athul KP**  
-Python Full Stack Developer
+**Athul KP**
 
-## References
-
-[1]: https://react.dev/ "React documentation"
-[2]: https://www.typescriptlang.org/ "TypeScript documentation"
-[3]: https://vite.dev/ "Vite documentation"
-[4]: https://playwright.dev/ "Playwright documentation"
-[5]: https://github.com/dequelabs/axe-core "axe-core repository"
