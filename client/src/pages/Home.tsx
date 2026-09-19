@@ -5,9 +5,11 @@ import { createTask as insertTask, deleteTask as removeTask, fetchTasks, updateT
 import { createNote as insertNote, deleteNote as removeNote, fetchNotes, updateNote as persistNote, type Note, type NoteDraft } from "@/lib/notes";
 import { fetchDailyIntention, saveDailyIntention } from "@/lib/intentions";
 import { createFocusSession } from "@/lib/focusSessions";
+import { getDefaultTaskMinutes } from "@/lib/preferences";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import DayweaveShell from "@/components/DayweaveShell";
+import { PreferencesDialog } from "@/components/PreferencesDialog";
 
 type WeekDay = { date: string; label: string; short: string; number: string; current?: boolean };
 type TaskErrors = Partial<Record<keyof TaskDraft, string>>;
@@ -26,7 +28,7 @@ const formatSidebarDate = (date: string) => new Intl.DateTimeFormat("en-US", { w
 const formatWeekRange = (weekDays: WeekDay[]) => { const first = parseDateOnly(weekDays[0].date); const last = parseDateOnly(weekDays[weekDays.length - 1].date); const firstMonth = new Intl.DateTimeFormat("en-US", { month: "long" }).format(first); const lastMonth = new Intl.DateTimeFormat("en-US", { month: "long" }).format(last); const firstYear = first.getFullYear(); const lastYear = last.getFullYear(); if (firstYear === lastYear && firstMonth === lastMonth) return `${firstMonth} ${first.getDate()} — ${last.getDate()}, ${firstYear}`; if (firstYear === lastYear) return `${firstMonth} ${first.getDate()} — ${lastMonth} ${last.getDate()}, ${firstYear}`; return `${firstMonth} ${first.getDate()}, ${firstYear} — ${lastMonth} ${last.getDate()}, ${lastYear}`; };
 const energyStyles: Record<Energy, string> = { Deep: "energy-deep", Light: "energy-light", Social: "energy-social" };
 const sections: Section[] = ["Morning", "Midday", "Afternoon"];
-const makeDefaultTaskDraft = (date: string): TaskDraft => ({ title: "", note: "A small, clear next step.", time: "16:00", minutes: 30, energy: "Light", section: "Afternoon", date });
+const makeDefaultTaskDraft = (date: string): TaskDraft => ({ title: "", note: "A small, clear next step.", time: "16:00", minutes: getDefaultTaskMinutes(), energy: "Light", section: "Afternoon", date });
 const formatMinutes = (minutes: number) => minutes >= 60 ? `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ""}` : `${minutes}m`;
 const formatNoteDate = (value: string) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(value));
 const localDateTimeTimestamp = (date: string, time: string) => { const [year, month, day] = date.split("-").map(Number); const [hours, minutes] = time.split(":").map(Number); return new Date(year, month - 1, day, hours, minutes, 0, 0).getTime(); };
@@ -153,7 +155,7 @@ export default function Home() {
   const intentionLoadSequence = useRef(0); const intentionEditVersion = useRef(0); const intentionDirty = useRef(false); const intentionWriteQueue = useRef<Promise<void>>(Promise.resolve());
   const intentionKey = userId ? `${userId}:${currentDate}` : ""; const intentionKeyRef = useRef(intentionKey); intentionKeyRef.current = intentionKey;
   const visibleIntention = intentionLoadedKey === intentionKey ? intention : DEFAULT_DAILY_INTENTION;
-  const [view, setView] = useState<"today" | "week" | "notes">("today"); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(() => loadFocusSession()); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState("");
+  const [view, setView] = useState<"today" | "week" | "notes">("today"); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(() => loadFocusSession()); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [taskModal, setTaskModal] = useState<"create" | "edit" | null>(null); const [formDraft, setFormDraft] = useState<TaskDraft>(() => makeDefaultTaskDraft(localDateString())); const [editingId, setEditingId] = useState<string | null>(null); const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [noteModal, setNoteModal] = useState<"create" | "edit" | null>(null); const [noteDraft, setNoteDraft] = useState<NoteDraft>({ title: "", body: "" }); const [editingNoteId, setEditingNoteId] = useState<string | null>(null); const [noteDeleteConfirm, setNoteDeleteConfirm] = useState(false);
   const focusCompletionRef = useRef<string | null>(null);
@@ -382,7 +384,7 @@ export default function Home() {
     onNavigateWeek={() => setView("week")}
     onNavigateNotes={() => setView("notes")}
     onNavigateFocusHistory={() => setLocation("/focus-history")}
-    onPreferencesClick={() => showToast("Settings are coming soon")}
+    onPreferencesClick={() => setPreferencesOpen(true)}
     ariaHidden={focusOpen}
     beforeMobileNav={(tasksLoading || tasksError) && <p role={tasksLoading ? "status" : "alert"}>{tasksLoading ? "Loading your tasks…" : `Tasks could not be loaded: ${tasksError}`}</p>}
     topActions={<div className="top-actions"><button className="icon-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="More options"><MoreHorizontal size={19} /></button>{menuOpen && <div className="pop-menu"><button onClick={() => { setMenuOpen(false); showToast("A blank day is a brave start"); }}>Clear the day</button><button onClick={() => { setMenuOpen(false); showToast("Share link copied"); }}>Share view</button></div>}<button className="focus-button" onClick={() => startFocus(selectedTask)}><Play size={15} fill="currentColor" /> Focus mode</button></div>}
@@ -391,6 +393,7 @@ export default function Home() {
       {taskModal && <div className="modal-backdrop task-modal-backdrop" onClick={() => setTaskModal(null)}><div className="task-form-modal" role="dialog" aria-modal="true" aria-labelledby="task-form-title" onClick={(event) => event.stopPropagation()}><TaskForm mode={taskModal} initial={formDraft} weekDays={weekDays} onSave={saveTask} onCancel={() => setTaskModal(null)} onRequestDelete={() => setDeleteConfirm(true)} deleteConfirm={deleteConfirm} onConfirmDelete={deleteTask} onCancelDelete={() => setDeleteConfirm(false)} /></div></div>}
       {noteModal && <div className="modal-backdrop task-modal-backdrop" onClick={() => setNoteModal(null)}><div className="task-form-modal note-form-modal" role="dialog" aria-modal="true" aria-labelledby="note-form-title" onClick={(event) => event.stopPropagation()}><NoteForm mode={noteModal} initial={noteDraft} onSave={saveNote} onCancel={() => setNoteModal(null)} onRequestDelete={() => setNoteDeleteConfirm(true)} deleteConfirm={noteDeleteConfirm} onConfirmDelete={deleteNote} onCancelDelete={() => setNoteDeleteConfirm(false)} /></div></div>}
       {toast && <div className="toast" role="status" aria-live="polite"><Check size={16} /> {toast}</div>}
+      <PreferencesDialog open={preferencesOpen} onOpenChange={setPreferencesOpen} />
     </>}
   >
 

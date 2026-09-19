@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFocusSessions, type FocusSessionHistory } from "@/lib/focusSessions";
 import DayweaveShell from "@/components/DayweaveShell";
+import { PreferencesDialog } from "@/components/PreferencesDialog";
 import { useLocation } from "wouter";
-import { toast } from "sonner";
 
 function localDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -43,6 +43,7 @@ export default function FocusHistory() {
   const [, setLocation] = useLocation();
   const { userId } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [sessions, setSessions] = useState<FocusSessionHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -116,7 +117,7 @@ export default function FocusHistory() {
       onNavigateWeek={() => setLocation("/")}
       onNavigateNotes={() => setLocation("/")}
       onNavigateFocusHistory={() => setLocation("/focus-history")}
-      onPreferencesClick={() => toast("Settings are coming soon")}
+      onPreferencesClick={() => setPreferencesOpen(true)}
     >
       <section className="notes-hero">
         <div>
@@ -195,6 +196,7 @@ export default function FocusHistory() {
           </div>
         )}
       </div>
+      <PreferencesDialog open={preferencesOpen} onOpenChange={setPreferencesOpen} />
     </DayweaveShell>
   );
 }
