@@ -81,6 +81,7 @@ export default function DayweaveShell({
           <button className={activeSection === "week" ? "active" : ""} onClick={() => navigateFromMobile(onNavigateWeek)}><CalendarDays size={16} /> This week</button>
           <button className={activeSection === "notes" ? "active" : ""} onClick={() => navigateFromMobile(onNavigateNotes)}><Inbox size={16} /> Loose notes{notesCount !== undefined && <span>{notesCount}</span>}</button>
           <button className={activeSection === "focus-history" ? "active" : ""} onClick={() => navigateFromMobile(onNavigateFocusHistory)}><Timer size={16} /> Focus History</button>
+          <button onClick={() => navigateFromMobile(onPreferencesClick)}><Compass size={16} /> Preferences</button>
         </nav>}
         {children}
       </main>
