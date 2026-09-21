@@ -89,6 +89,72 @@ function WeeklyView({ tasks, selectedDay, setSelectedDay, openCreate, openEdit, 
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);
   const dragClickBlockUntil = useRef(0);
+  const edgeAutoScroll = useRef<{ active: boolean; frame: number | null; lastFrameAt: number | null; velocity: number; cleanup: (() => void) | null }>({ active: false, frame: null, lastFrameAt: null, velocity: 0, cleanup: null });
+  const stopEdgeAutoScroll = () => {
+    const scroll = edgeAutoScroll.current;
+    scroll.active = false;
+    scroll.velocity = 0;
+    scroll.lastFrameAt = null;
+    if (scroll.frame !== null) window.cancelAnimationFrame(scroll.frame);
+    scroll.frame = null;
+    scroll.cleanup?.();
+    scroll.cleanup = null;
+  };
+  const updateEdgeAutoScroll = (clientY: number) => {
+    const scroll = edgeAutoScroll.current;
+    if (!scroll.active || !window.matchMedia("(max-width: 740px)").matches) {
+      scroll.velocity = 0;
+      if (scroll.frame !== null) window.cancelAnimationFrame(scroll.frame);
+      scroll.frame = null;
+      scroll.lastFrameAt = null;
+      return;
+    }
+
+    const edgeZone = 88;
+    const distanceFromBottom = window.innerHeight - clientY;
+    if (clientY < edgeZone) {
+      scroll.velocity = -420 * Math.min(1, (edgeZone - clientY) / edgeZone);
+    } else if (distanceFromBottom < edgeZone) {
+      scroll.velocity = 420 * Math.min(1, (edgeZone - distanceFromBottom) / edgeZone);
+    } else {
+      scroll.velocity = 0;
+      if (scroll.frame !== null) window.cancelAnimationFrame(scroll.frame);
+      scroll.frame = null;
+      scroll.lastFrameAt = null;
+      return;
+    }
+
+    if (scroll.velocity === 0 || scroll.frame !== null) return;
+    const scrollFrame = (timestamp: number) => {
+      scroll.frame = null;
+      if (!scroll.active || scroll.velocity === 0) return;
+      if (scroll.lastFrameAt !== null) {
+        const previousScrollY = window.scrollY;
+        const elapsed = Math.min(timestamp - scroll.lastFrameAt, 32) / 1000;
+        window.scrollBy(0, scroll.velocity * elapsed);
+        if (window.scrollY === previousScrollY) {
+          scroll.lastFrameAt = null;
+          return;
+        }
+      }
+      scroll.lastFrameAt = timestamp;
+      scroll.frame = window.requestAnimationFrame(scrollFrame);
+    };
+    scroll.frame = window.requestAnimationFrame(scrollFrame);
+  };
+  const startEdgeAutoScroll = (clientY: number) => {
+    stopEdgeAutoScroll();
+    edgeAutoScroll.current.active = true;
+    const trackDragPosition = (event: DragEvent) => updateEdgeAutoScroll(event.clientY);
+    document.addEventListener("drag", trackDragPosition, true);
+    document.addEventListener("dragover", trackDragPosition, true);
+    edgeAutoScroll.current.cleanup = () => {
+      document.removeEventListener("drag", trackDragPosition, true);
+      document.removeEventListener("dragover", trackDragPosition, true);
+    };
+    updateEdgeAutoScroll(clientY);
+  };
+  useEffect(() => () => stopEdgeAutoScroll(), []);
   const weekTasks = tasks.filter((task) => weekDays.some((day) => day.date === task.date));
   const completed = weekTasks.filter((task) => task.done).length;
   const progress = weekTasks.length ? Math.round((completed / weekTasks.length) * 100) : 0;
@@ -96,7 +162,7 @@ function WeeklyView({ tasks, selectedDay, setSelectedDay, openCreate, openEdit, 
   return <div className="week-view">
     <section className="week-hero"><div><div className="eyebrow accent"><CalendarDays size={13} /> WEEKLY FIELD NOTES</div><h1>Make a week<br />that can breathe.</h1><p>See the shape of what’s ahead without filling every inch of it.</p></div><div className="week-score"><div className="week-score-ring" style={{ "--progress": `${progress * 3.6}deg` } as React.CSSProperties}><div><strong>{progress}</strong><span>% clear</span></div></div><div><span className="eyebrow">WEEK IN VIEW</span><strong>{completed} of {tasks.length} tasks moved</strong><small>{formatMinutes(plannedMinutes)} planned across the week</small></div></div></section>
     <div className="week-toolbar"><div><div className="flex items-center gap-1"><button type="button" className="icon-button" onClick={onPreviousWeek} aria-label="Previous week"><ChevronLeft size={17} /></button><span className="eyebrow">{weekLabel}</span><button type="button" className="icon-button" onClick={onNextWeek} aria-label="Next week"><ChevronRight size={17} /></button>{weekOffset !== 0 && <button type="button" className="secondary-action" onClick={onToday}>Today</button>}</div><h2>Seven small horizons</h2></div><button className="primary-action" onClick={() => openCreate("", selectedDay)}><Plus size={15} /> Plan a task</button></div>
-    <div className="weekly-grid">{weekDays.map((day) => { const dayTasks = tasks.filter((task) => task.date === day.date); const dayCompleted = dayTasks.filter((task) => task.done).length; const dayMinutes = dayTasks.reduce((sum, task) => sum + task.minutes, 0); const selected = selectedDay === day.date; const dropTarget = dropTargetDate === day.date; return <article className={`weekly-day ${day.current ? "current-day" : ""} ${selected ? "selected-day" : ""} ${dropTarget ? "ring-2 ring-inset ring-[#89967b]/60" : ""}`} key={day.date} onClick={() => { if (Date.now() < dragClickBlockUntil.current) return; setSelectedDay(day.date); setActiveId(dayTasks.find((task) => !task.done)?.id ?? dayTasks[0]?.id ?? null); }} onDragOver={(event) => { if (!draggedTaskId) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropTargetDate(day.date); }} onDragLeave={() => setDropTargetDate((date) => date === day.date ? null : date)} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId; setDraggedTaskId(null); setDropTargetDate(null); dragClickBlockUntil.current = Date.now() + 500; window.setTimeout(() => { dragClickBlockUntil.current = 0; }, 500); if (taskId) onMoveTask(taskId, day.date); }}><header className="weekly-day-header"><div><span>{day.short}</span><strong>{day.number}</strong></div>{day.current && <em>Today</em>}<button className="day-menu" onClick={(event) => { event.stopPropagation(); setSelectedDay(day.date); showToast(`${day.label} is in view`); }} aria-label={`Focus on ${day.label}`}><ArrowUpRight size={16} /></button></header><div className="weekly-day-stats"><span>{dayTasks.length} {dayTasks.length === 1 ? "task" : "tasks"}</span><span>{dayCompleted} done</span><span>{formatMinutes(dayMinutes)}</span></div><div className="weekly-day-tasks">{dayTasks.length ? dayTasks.map((task) => <div className={`week-task ${task.done ? "week-task-done" : ""} cursor-grab active:cursor-grabbing`} key={task.id} draggable onDragStart={(event) => { if ((event.target as HTMLElement).closest("button")) { event.preventDefault(); return; } event.stopPropagation(); setDraggedTaskId(task.id); setDropTargetDate(null); dragClickBlockUntil.current = Date.now() + 1000; event.dataTransfer.setData("text/plain", task.id); event.dataTransfer.effectAllowed = "move"; }} onDragEnd={() => { setDraggedTaskId(null); setDropTargetDate(null); window.setTimeout(() => { dragClickBlockUntil.current = 0; }, 500); }} onClick={(event) => { event.stopPropagation(); if (Date.now() < dragClickBlockUntil.current) return; setSelectedDay(day.date); setActiveId(task.id); }}><button className="week-check" onClick={(event) => { event.stopPropagation(); toggleTask(task.id); }} aria-label={`Mark ${task.title} complete`}>{task.done && <Check size={11} />}</button><div className="week-task-copy"><div><span>{task.time}</span><span className={`energy-tag ${energyStyles[task.energy]}`}>{task.energy}</span></div><strong>{task.title}</strong></div><button className="week-task-edit" onClick={(event) => { event.stopPropagation(); openEdit(task); }} aria-label={`Edit ${task.title}`}><Pencil size={13} /></button></div>) : <div className="weekly-empty"><Leaf size={17} /><span>{day.current ? "A clean page." : "Open space."}</span><button onClick={(event) => { event.stopPropagation(); openCreate("", day.date); }}>Add one <Plus size={11} /></button></div>}</div></article>; })}</div>
+    <div className="weekly-grid">{weekDays.map((day) => { const dayTasks = tasks.filter((task) => task.date === day.date); const dayCompleted = dayTasks.filter((task) => task.done).length; const dayMinutes = dayTasks.reduce((sum, task) => sum + task.minutes, 0); const selected = selectedDay === day.date; const dropTarget = dropTargetDate === day.date; return <article className={`weekly-day ${day.current ? "current-day" : ""} ${selected ? "selected-day" : ""} ${dropTarget ? "ring-2 ring-inset ring-[#89967b]/60" : ""}`} key={day.date} onClick={() => { if (Date.now() < dragClickBlockUntil.current) return; setSelectedDay(day.date); setActiveId(dayTasks.find((task) => !task.done)?.id ?? dayTasks[0]?.id ?? null); }} onDragOver={(event) => { if (!draggedTaskId) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropTargetDate(day.date); }} onDragLeave={() => setDropTargetDate((date) => date === day.date ? null : date)} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const taskId = event.dataTransfer.getData("text/plain") || draggedTaskId; setDraggedTaskId(null); setDropTargetDate(null); stopEdgeAutoScroll(); dragClickBlockUntil.current = Date.now() + 500; window.setTimeout(() => { dragClickBlockUntil.current = 0; }, 500); if (taskId) onMoveTask(taskId, day.date); }}><header className="weekly-day-header"><div><span>{day.short}</span><strong>{day.number}</strong></div>{day.current && <em>Today</em>}<button className="day-menu" onClick={(event) => { event.stopPropagation(); setSelectedDay(day.date); showToast(`${day.label} is in view`); }} aria-label={`Focus on ${day.label}`}><ArrowUpRight size={16} /></button></header><div className="weekly-day-stats"><span>{dayTasks.length} {dayTasks.length === 1 ? "task" : "tasks"}</span><span>{dayCompleted} done</span><span>{formatMinutes(dayMinutes)}</span></div><div className="weekly-day-tasks">{dayTasks.length ? dayTasks.map((task) => <div className={`week-task ${task.done ? "week-task-done" : ""} cursor-grab active:cursor-grabbing`} key={task.id} draggable onDragStart={(event) => { if ((event.target as HTMLElement).closest("button")) { event.preventDefault(); return; } event.stopPropagation(); setDraggedTaskId(task.id); setDropTargetDate(null); dragClickBlockUntil.current = Date.now() + 1000; event.dataTransfer.setData("text/plain", task.id); event.dataTransfer.effectAllowed = "move"; startEdgeAutoScroll(event.clientY); }} onDragEnd={() => { setDraggedTaskId(null); setDropTargetDate(null); stopEdgeAutoScroll(); window.setTimeout(() => { dragClickBlockUntil.current = 0; }, 500); }} onClick={(event) => { event.stopPropagation(); if (Date.now() < dragClickBlockUntil.current) return; setSelectedDay(day.date); setActiveId(task.id); }}><button className="week-check" onClick={(event) => { event.stopPropagation(); toggleTask(task.id); }} aria-label={`Mark ${task.title} complete`}>{task.done && <Check size={11} />}</button><div className="week-task-copy"><div><span>{task.time}</span><span className={`energy-tag ${energyStyles[task.energy]}`}>{task.energy}</span></div><strong>{task.title}</strong></div><button className="week-task-edit" onClick={(event) => { event.stopPropagation(); openEdit(task); }} aria-label={`Edit ${task.title}`}><Pencil size={13} /></button></div>) : <div className="weekly-empty"><Leaf size={17} /><span>{day.current ? "A clean page." : "Open space."}</span><button onClick={(event) => { event.stopPropagation(); openCreate("", day.date); }}>Add one <Plus size={11} /></button></div>}</div></article>; })}</div>
     <div className="week-note"><Wind size={16} /><span>Leave a little room between the landmarks.</span><button onClick={() => showToast("A spacious week is a useful week")}>Why?</button></div>
   </div>;
 }
