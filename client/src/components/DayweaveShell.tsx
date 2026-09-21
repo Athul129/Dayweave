@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CalendarDays, ChevronRight, Compass, Inbox, LayoutDashboard, Menu, SunMedium, Timer } from "lucide-react";
 import AuthAccountControl from "@/components/AuthAccountControl";
 
@@ -47,6 +47,32 @@ export default function DayweaveShell({
   afterMain,
   ariaHidden,
 }: DayweaveShellProps) {
+  const mobileNavRef = useRef<HTMLElement | null>(null);
+  const [mobileNavHasMoreRight, setMobileNavHasMoreRight] = useState(false);
+
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      setMobileNavHasMoreRight(false);
+      return;
+    }
+
+    const nav = mobileNavRef.current;
+    if (!nav) return;
+
+    const updateOverflow = () => {
+      const hasMoreRight = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1;
+      setMobileNavHasMoreRight((current) => current === hasMoreRight ? current : hasMoreRight);
+    };
+
+    updateOverflow();
+    nav.addEventListener("scroll", updateOverflow, { passive: true });
+    window.addEventListener("resize", updateOverflow);
+    return () => {
+      nav.removeEventListener("scroll", updateOverflow);
+      window.removeEventListener("resize", updateOverflow);
+    };
+  }, [activeSection, mobileNavOpen, notesCount, todayCount]);
+
   const navigateFromMobile = (navigate: () => void) => {
     navigate();
     onCloseMobileNav();
@@ -76,13 +102,15 @@ export default function DayweaveShell({
           {topActions}
         </header>
         {beforeMobileNav}
-        {mobileNavOpen && <nav id="mobile-navigation" className="mobile-nav" aria-label="Mobile navigation">
+        {mobileNavOpen && <div className={`mobile-nav-wrap ${mobileNavHasMoreRight ? "has-more-right" : ""}`}>
+          <nav ref={mobileNavRef} id="mobile-navigation" className="mobile-nav" aria-label="Mobile navigation">
           <button className={activeSection === "today" ? "active" : ""} onClick={() => navigateFromMobile(onNavigateToday)}><LayoutDashboard size={16} /> Today{todayCount !== undefined && <span>{todayCount}</span>}</button>
           <button className={activeSection === "week" ? "active" : ""} onClick={() => navigateFromMobile(onNavigateWeek)}><CalendarDays size={16} /> This week</button>
           <button className={activeSection === "notes" ? "active" : ""} onClick={() => navigateFromMobile(onNavigateNotes)}><Inbox size={16} /> Loose notes{notesCount !== undefined && <span>{notesCount}</span>}</button>
           <button className={activeSection === "focus-history" ? "active" : ""} onClick={() => navigateFromMobile(onNavigateFocusHistory)}><Timer size={16} /> Focus History</button>
           <button onClick={() => navigateFromMobile(onPreferencesClick)}><Compass size={16} /> Preferences</button>
-        </nav>}
+          </nav>
+        </div>}
         {children}
       </main>
       {afterMain}
