@@ -47,6 +47,7 @@ export default function FocusHistory() {
   const [sessions, setSessions] = useState<FocusSessionHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -76,7 +77,7 @@ export default function FocusHistory() {
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [userId, loadAttempt]);
 
   const today = new Date();
   const yesterday = new Date(today);
@@ -154,7 +155,23 @@ export default function FocusHistory() {
         {loading ? (
           <p className="rounded-xl border border-[#dfe3dc] bg-[#fffdf7] px-5 py-6 text-sm text-[#647679] shadow-[2px_3px_0_#e8e4d9]" role="status">Loading...</p>
         ) : error ? (
-          <p className="rounded-xl border border-[#e5d8cd] bg-[#fffaf5] px-5 py-6 text-sm text-[#765f54]" role="alert">Unable to load Focus History.</p>
+          <div className="rounded-xl border border-[#e5d8cd] bg-[#fffaf5] px-5 py-6 text-sm text-[#765f54]">
+            <p className="m-0" role="alert">Unable to load Focus History.</p>
+            <button
+              type="button"
+              className="secondary-action mt-4"
+              aria-label="Retry loading Focus History"
+              disabled={loading}
+              onClick={() => {
+                if (loading) return;
+                setLoading(true);
+                setError(false);
+                setLoadAttempt((attempt) => attempt + 1);
+              }}
+            >
+              Retry
+            </button>
+          </div>
         ) : sessions.length === 0 ? (
           <p className="rounded-xl border border-[#dfe3dc] bg-[#fffdf7] px-5 py-6 text-sm text-[#647679] shadow-[2px_3px_0_#e8e4d9]">No completed focus sessions yet.</p>
         ) : (
