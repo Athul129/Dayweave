@@ -7,14 +7,6 @@ export default function AuthAccountControl({ section }: { section?: string }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const controlRef = useRef<HTMLDivElement>(null);
-  if (!user) return null;
-  const email = user.email?.trim() ?? "";
-  const emailName = email.split("@")[0] ?? "";
-  const nameParts = emailName.split(/[._+-]+/).filter(Boolean);
-  const initials = nameParts.length > 1
-    ? nameParts.slice(0, 2).map((part) => part[0]).join("").toUpperCase()
-    : emailName.slice(0, 2).toUpperCase();
-
   useEffect(() => { setOpen(false); }, [section]);
   useEffect(() => {
     if (!open) return;
@@ -32,6 +24,14 @@ export default function AuthAccountControl({ section }: { section?: string }) {
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [open]);
+
+  if (!user) return null;
+  const email = user.email?.trim() ?? "";
+  const emailName = email.split("@")[0] ?? "";
+  const nameParts = emailName.split(/[._+-]+/).filter(Boolean);
+  const initials = nameParts.length > 1
+    ? nameParts.slice(0, 2).map((part) => part[0]).join("").toUpperCase()
+    : emailName.slice(0, 2).toUpperCase();
 
   const logout = async () => {
     setError("");
