@@ -29,6 +29,17 @@ const formatWeekRange = (weekDays: WeekDay[]) => { const first = parseDateOnly(w
 const energyStyles: Record<Energy, string> = { Deep: "energy-deep", Light: "energy-light", Social: "energy-social" };
 const sections: Section[] = ["Morning", "Midday", "Afternoon"];
 const makeDefaultTaskDraft = (date: string): TaskDraft => ({ title: "", note: "A small, clear next step.", time: "16:00", minutes: getDefaultTaskMinutes(), energy: "Light", section: "Afternoon", date });
+type TaskErrorOperation = "load" | "save" | "update" | "move" | "delete";
+const taskErrorMessage = (operation: TaskErrorOperation, error: unknown) => {
+  console.error(`Task ${operation} failed`, error);
+  switch (operation) {
+    case "load": return "Your tasks could not be loaded. Please try again.";
+    case "save": return "Task could not be saved. Please try again.";
+    case "update": return "Task could not be updated. Please try again.";
+    case "move": return "Task could not be moved. Please try again.";
+    case "delete": return "Task could not be deleted. Please try again.";
+  }
+};
 const getTaskDateLockReason = (task: Task | undefined, focusSession: FocusSession | null, today: string) => {
   if (!task) return null;
   if (task.done) return "The date is locked for completed tasks.";
@@ -273,8 +284,9 @@ export default function Home() {
       setFocusSession(restoredSession);
     }).catch((error: unknown) => {
       if (!active) return;
-      setTasksError(error instanceof Error ? error.message : "Tasks could not be loaded.");
-      setToast("Your tasks could not be loaded. Please try again.");
+      const message = taskErrorMessage("load", error);
+      setTasksError(message);
+      setToast(message);
     }).finally(() => { if (active) setTasksLoading(false); });
     return () => { active = false; };
   }, [userId]);
@@ -362,7 +374,7 @@ export default function Home() {
       try {
         const updated = await persistTask(userId, id, { done: !current.done });
         if (userIdRef.current === userId) replaceTasks((items) => items.map((task) => task.id === id ? updated : task));
-      } catch (error) { setToast(error instanceof Error ? `Task update failed: ${error.message}` : "Task update failed."); }
+      } catch (error) { setToast(taskErrorMessage("update", error)); }
     });
   };
   const moveTaskToDate = (id: string, date: string) => {
@@ -406,7 +418,7 @@ export default function Home() {
         }
       } catch (error) {
         if (userIdRef.current === userId) {
-          setToast(error instanceof Error ? `Task move failed: ${error.message}` : "Task move failed. Please try again.");
+          setToast(taskErrorMessage("move", error));
         }
       }
     });
@@ -418,7 +430,7 @@ export default function Home() {
       try {
         const updated = await persistTask(userId, id, { time: "16:30", section: "Afternoon" });
         if (userIdRef.current === userId) { replaceTasks((items) => items.map((task) => task.id === id ? updated : task)); showToast("Moved to the afternoon"); }
-      } catch (error) { setToast(error instanceof Error ? `Task update failed: ${error.message}` : "Task update failed."); }
+      } catch (error) { setToast(taskErrorMessage("update", error)); }
     });
   };
   const openCreate = (title = "", date = currentDate) => { const allowedDate = date < currentDate ? currentDate : date; setFormDraft({ ...makeDefaultTaskDraft(allowedDate), title, date: allowedDate }); setEditingId(null); setDeleteConfirm(false); setTaskModal("create"); setNewTask(""); };
@@ -460,7 +472,7 @@ export default function Home() {
           if (userIdRef.current === userId) { replaceTasks((items) => [...items, created]); setActiveId(created.id); showToast("Added to your route"); }
         }
         if (userIdRef.current === userId) { setTaskModal(null); setEditingId(null); setDeleteConfirm(false); }
-      } catch (error) { setToast(error instanceof Error ? `Task save failed: ${error.message}` : "Task save failed. Please try again."); }
+      } catch (error) { setToast(taskErrorMessage("save", error)); }
       finally { taskSaveInFlight.current = false; setTaskSavePending(false); }
     });
   };
@@ -477,7 +489,7 @@ export default function Home() {
           if (activeId === targetId) setActiveId(remaining.find((task) => !task.done)?.id ?? remaining[0]?.id ?? null);
           setTaskModal(null); setEditingId(null); setDeleteConfirm(false); showToast("Task deleted");
         }
-      } catch (error) { setToast(error instanceof Error ? `Task delete failed: ${error.message}` : "Task delete failed. Please try again."); }
+      } catch (error) { setToast(taskErrorMessage("delete", error)); }
     });
   };
   const openNoteCreate = () => { setNoteDraft({ title: "", body: "" }); setEditingNoteId(null); setNoteDeleteConfirm(false); setNoteModal("create"); };
