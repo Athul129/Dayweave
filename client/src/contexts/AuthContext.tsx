@@ -9,7 +9,7 @@ type AuthContextValue = {
   user: User | null;
   userId: string | null;
   signIn: (email: string, password: string) => Promise<AuthResponse>;
-  signUp: (email: string, password: string) => Promise<AuthResponse>;
+  signUp: (email: string, password: string, displayName: string) => Promise<AuthResponse>;
   signOut: () => Promise<{ error: Error | null }>;
 };
 
@@ -52,10 +52,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null,
     userId: session?.user.id ?? null,
     signIn: (email, password) => getSupabaseClient().auth.signInWithPassword({ email, password }),
-    signUp: (email, password) => getSupabaseClient().auth.signUp({
+    signUp: (email, password, displayName) => getSupabaseClient().auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: { display_name: displayName },
+      },
     }),
     signOut: async () => {
       const { error } = await getSupabaseClient().auth.signOut();
