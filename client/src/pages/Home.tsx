@@ -367,15 +367,17 @@ export default function Home() {
   const grouped = useMemo(() => sections.map((section) => ({ section, tasks: todayTasks.filter((task) => task.section === section) })).filter((group) => group.tasks.length), [todayTasks]);
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2400); };
   const changeDisplayedWeek = (amount: number) => { setWeekOffset((offset) => offset + amount); setSelectedWeekDay((date) => addDateDays(date, amount * 7)); };
-  const toggleTask = (id: string) => {
-    if (!userId || tasksLoading) return;
-    void queueTaskMutation(async () => {
+  const toggleTask = async (id: string): Promise<boolean> => {
+    if (!userId || tasksLoading) return false;
+    return queueTaskMutation(async () => {
       const current = tasksRef.current.find((task) => task.id === id);
-      if (!current || userIdRef.current !== userId) return;
+      if (!current || userIdRef.current !== userId) return false;
       try {
         const updated = await persistTask(userId, id, { done: !current.done });
         if (userIdRef.current === userId) replaceTasks((items) => items.map((task) => task.id === id ? updated : task));
+        return true;
       } catch (error) { setToast(taskErrorMessage("update", error)); }
+      return false;
     });
   };
   const moveTaskToDate = (id: string, date: string) => {
@@ -538,7 +540,7 @@ export default function Home() {
   };
   const startFocus = (requestedTask?: Task) => { if (!userId) { setFocusSession(null); setFocusOpen(false); return; } const task = requestedTask && !requestedTask.done ? requestedTask : tasks.find((item) => !item.done); if (!task) { setFocusSession(null); setFocusOpen(true); return; } setActiveId(task.id); setFocusSession((current) => { const now = Date.now(); if (current?.taskId === task.id && !current.completed) return current.pausedAt !== null ? resumeFocusSession(current, now) : { ...current, isRunning: true, updatedAt: now }; const startAt = localDateTimeTimestamp(task.date, task.time); const endAt = startAt + task.minutes * 60 * 1000; return { sessionId: crypto.randomUUID(), taskId: task.id, durationSeconds: task.minutes * 60, startAt, endAt, pausedAt: null, pausedRemainingSeconds: null, pausedSeconds: 0, isRunning: true, completed: false, updatedAt: now }; }); setFocusOpen(true); };
   const exitFocus = () => { setFocusOpen(false); setFocusSession((current) => current ? pauseFocusSession(current) : null); };
-  const completeFocus = async () => { if (!focusSession || focusCompletionRef.current === focusSession.sessionId) return; const completedSession = focusSession; focusCompletionRef.current = completedSession.sessionId; const task = tasksRef.current.find((item) => item.id === completedSession.taskId); let historySaved = Boolean(userId); try { if (userId) await createFocusSession(userId, { sessionId: completedSession.sessionId, taskId: task?.id ?? null, taskTitle: task?.title ?? "Focus session", taskDate: task?.date ?? null, plannedDurationSeconds: completedSession.durationSeconds, startedAt: new Date(completedSession.startAt).toISOString(), completedAt: new Date().toISOString(), pausedSeconds: completedSession.pausedSeconds }); } catch { historySaved = false; } toggleTask(completedSession.taskId); setFocusOpen(false); setFocusSession(null); showToast(historySaved ? "Task completed" : "Task completed, but Focus History could not be saved."); };
+  const completeFocus = async () => { if (!focusSession || focusCompletionRef.current === focusSession.sessionId) return; const completedSession = focusSession; focusCompletionRef.current = completedSession.sessionId; const task = tasksRef.current.find((item) => item.id === completedSession.taskId); let historySaved = Boolean(userId); try { if (userId) await createFocusSession(userId, { sessionId: completedSession.sessionId, taskId: task?.id ?? null, taskTitle: task?.title ?? "Focus session", taskDate: task?.date ?? null, plannedDurationSeconds: completedSession.durationSeconds, startedAt: new Date(completedSession.startAt).toISOString(), completedAt: new Date().toISOString(), pausedSeconds: completedSession.pausedSeconds }); } catch { historySaved = false; } const taskCompleted = await toggleTask(completedSession.taskId); if (!taskCompleted) { focusCompletionRef.current = null; showToast("Task could not be completed. Please try again."); return; } setFocusOpen(false); setFocusSession(null); showToast(historySaved ? "Task completed" : "Task completed, but Focus History could not be saved."); };
   const taskBeingEdited = editingId ? tasks.find((task) => task.id === editingId) : undefined;
   const taskDateLockReason = taskModal === "edit" ? getTaskDateLockReason(taskBeingEdited, focusSession, currentDate) : null;
   return <DayweaveShell

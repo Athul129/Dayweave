@@ -50,7 +50,7 @@ function mapFocusSession(row: FocusSessionRow): FocusSessionHistory {
 export async function createFocusSession(userId: string, draft: FocusSessionHistoryDraft): Promise<FocusSessionHistory> {
   const { data, error } = await getSupabaseClient()
     .from("focus_sessions")
-    .insert({
+    .upsert({
       session_id: draft.sessionId,
       user_id: userId,
       task_id: draft.taskId,
@@ -60,7 +60,7 @@ export async function createFocusSession(userId: string, draft: FocusSessionHist
       started_at: draft.startedAt,
       completed_at: draft.completedAt,
       paused_seconds: draft.pausedSeconds,
-    })
+    }, { onConflict: "session_id" })
     .select("*")
     .single();
 
