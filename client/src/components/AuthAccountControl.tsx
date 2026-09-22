@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { LogOut, MoreHorizontal, UserRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import ProfileDialog from "@/components/ProfileDialog";
 
 export default function AuthAccountControl({ section }: { section?: string }) {
   const { user, signOut, userId } = useAuth();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
   const controlRef = useRef<HTMLDivElement>(null);
   useEffect(() => { setOpen(false); }, [section]);
   useEffect(() => {
@@ -28,10 +30,13 @@ export default function AuthAccountControl({ section }: { section?: string }) {
   if (!user) return null;
   const email = user.email?.trim() ?? "";
   const emailName = email.split("@")[0] ?? "";
-  const nameParts = emailName.split(/[._+-]+/).filter(Boolean);
+  const displayName = typeof user.user_metadata?.display_name === "string" ? user.user_metadata.display_name.trim() : "";
+  const primaryName = displayName || email;
+  const initialsSource = displayName || emailName;
+  const nameParts = initialsSource.split(/[\s._+-]+/).filter(Boolean);
   const initials = nameParts.length > 1
     ? nameParts.slice(0, 2).map((part) => part[0]).join("").toUpperCase()
-    : emailName.slice(0, 2).toUpperCase();
+    : initialsSource.slice(0, 2).toUpperCase();
 
   const logout = async () => {
     setError("");
@@ -46,9 +51,10 @@ export default function AuthAccountControl({ section }: { section?: string }) {
     {error && <span className="auth-account-error" role="alert">{error}</span>}
     <div className="profile auth-account-profile">
       <div className="avatar" aria-hidden="true">{initials || <UserRound size={15} />}</div>
-      <div className="auth-account-identity"><strong title={email}>{email}</strong><span>Personal space</span></div>
+      <div className="auth-account-identity"><strong title={primaryName}>{primaryName}</strong><span>{email}</span></div>
       <button type="button" className="auth-account-options" aria-label="Account options" aria-expanded={open} onClick={() => setOpen((current) => !current)}><MoreHorizontal size={18} /></button>
     </div>
-    {open && <div className="auth-account-menu"><span>Signed in</span><span className="auth-account-menu-email">{email}</span><button type="button" onClick={logout}><LogOut size={14} /> Sign out</button></div>}
+    {open && <div className="auth-account-menu"><span>Signed in</span><span className="auth-account-menu-email">{email}</span><button type="button" onClick={() => { setOpen(false); setProfileOpen(true); }}>Edit profile</button><button type="button" onClick={logout}><LogOut size={14} /> Sign out</button></div>}
+    <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
   </div>;
 }

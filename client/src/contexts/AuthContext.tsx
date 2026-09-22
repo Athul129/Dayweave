@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { AuthResponse, Session, User } from "@supabase/supabase-js";
+import type { AuthResponse, Session, User, UserResponse } from "@supabase/supabase-js";
 import { getSupabaseClient, isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 type AuthContextValue = {
@@ -10,6 +10,7 @@ type AuthContextValue = {
   userId: string | null;
   signIn: (email: string, password: string) => Promise<AuthResponse>;
   signUp: (email: string, password: string, displayName: string) => Promise<AuthResponse>;
+  updateDisplayName: (displayName: string) => Promise<UserResponse>;
   signOut: () => Promise<{ error: Error | null }>;
 };
 
@@ -60,6 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: { display_name: displayName },
       },
     }),
+    updateDisplayName: async (displayName) => {
+      const trimmedDisplayName = displayName.trim();
+      if (!trimmedDisplayName) throw new Error("Display name is required.");
+      const response = await getSupabaseClient().auth.updateUser({ data: { display_name: trimmedDisplayName } });
+      if (!response.error && response.data.user) {
+        setSession((current) => current ? { ...current, user: response.data.user! } : current);
+      }
+      return response;
+    },
     signOut: async () => {
       const { error } = await getSupabaseClient().auth.signOut();
       return { error };
