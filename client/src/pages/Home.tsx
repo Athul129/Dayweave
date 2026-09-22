@@ -65,6 +65,7 @@ const formatSidebarDate = (date: string) => new Intl.DateTimeFormat("en-US", { w
 const formatWeekRange = (weekDays: WeekDay[]) => { const first = parseDateOnly(weekDays[0].date); const last = parseDateOnly(weekDays[weekDays.length - 1].date); const firstMonth = new Intl.DateTimeFormat("en-US", { month: "long" }).format(first); const lastMonth = new Intl.DateTimeFormat("en-US", { month: "long" }).format(last); const firstYear = first.getFullYear(); const lastYear = last.getFullYear(); if (firstYear === lastYear && firstMonth === lastMonth) return `${firstMonth} ${first.getDate()} — ${last.getDate()}, ${firstYear}`; if (firstYear === lastYear) return `${firstMonth} ${first.getDate()} — ${lastMonth} ${last.getDate()}, ${firstYear}`; return `${firstMonth} ${first.getDate()}, ${firstYear} — ${lastMonth} ${last.getDate()}, ${lastYear}`; };
 const energyStyles: Record<Energy, string> = { Deep: "energy-deep", Light: "energy-light", Social: "energy-social" };
 const sections: Section[] = ["Morning", "Midday", "Afternoon"];
+const viewForPath = (path: string): "today" | "week" | "notes" => path === "/this-week" ? "week" : path === "/loose-notes" ? "notes" : "today";
 const makeDefaultTaskDraft = (date: string): TaskDraft => ({ title: "", note: "A small, clear next step.", time: "16:00", minutes: getDefaultTaskMinutes(), energy: "Light", section: "Afternoon", date });
 type TaskErrorOperation = "load" | "save" | "update" | "move" | "delete";
 const taskErrorMessage = (operation: TaskErrorOperation, error: unknown) => {
@@ -271,7 +272,7 @@ function FocusMode({ task, session, setSession, onComplete, onExit, onAddTask, o
 
 export default function Home() {
   const { userId } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [currentDate, setCurrentDate] = useState(localDateString);
   const [weekOffset, setWeekOffset] = useState(0); const displayedWeekDays = useMemo(() => getWeekDays(addDateDays(currentDate, weekOffset * 7), currentDate), [currentDate, weekOffset]); const weekLabel = formatWeekRange(displayedWeekDays);
   const [tasks, setTasks] = useState<Task[]>([]); const tasksRef = useRef<Task[]>([]); const userIdRef = useRef(userId); userIdRef.current = userId;
@@ -288,11 +289,11 @@ export default function Home() {
   const intentionKey = userId ? `${userId}:${currentDate}` : ""; const intentionKeyRef = useRef(intentionKey); intentionKeyRef.current = intentionKey;
   const visibleIntention = intentionLoadedKey === intentionKey ? intention : DEFAULT_DAILY_INTENTION;
   const visibleIntentionSaveStatus = intentionLoadedKey === intentionKey && intentionSaveStatus?.key === intentionKey && intentionSaveStatus.editVersion === intentionEditVersion.current ? intentionSaveStatus.status : null;
-  const [view, setView] = useState<"today" | "week" | "notes">("today"); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(null); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const previousFocusUserId = useRef(userId); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [view, setView] = useState<"today" | "week" | "notes">(() => viewForPath(location)); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(null); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const previousFocusUserId = useRef(userId); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [taskModal, setTaskModal] = useState<"create" | "edit" | null>(null); const [formDraft, setFormDraft] = useState<TaskDraft>(() => makeDefaultTaskDraft(localDateString())); const [editingId, setEditingId] = useState<string | null>(null); const [deleteConfirm, setDeleteConfirm] = useState(false); const [taskSavePending, setTaskSavePending] = useState(false); const taskSaveInFlight = useRef(false);
   const [noteModal, setNoteModal] = useState<"create" | "edit" | null>(null); const [noteDraft, setNoteDraft] = useState<NoteDraft>({ title: "", body: "" }); const [editingNoteId, setEditingNoteId] = useState<string | null>(null); const [noteDeleteConfirm, setNoteDeleteConfirm] = useState(false);
   const focusCompletionRef = useRef<string | null>(null);
-  useEffect(() => { setMenuOpen(false); }, [view]);
+  useEffect(() => { setMenuOpen(false); }, [view]); useEffect(() => { setView(viewForPath(location)); }, [location]);
   useEffect(() => {
     if (!menuOpen) return;
     const closeOnOutsidePointer = (event: PointerEvent) => { if (!(event.target as Element | null)?.closest(".top-actions")) setMenuOpen(false); };
@@ -599,9 +600,9 @@ export default function Home() {
     mobileNavOpen={mobileNavOpen}
     onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
     onCloseMobileNav={() => setMobileNavOpen(false)}
-    onNavigateToday={() => { setView("today"); setActiveId(todayTasks.find((task) => !task.done)?.id ?? todayTasks[0]?.id ?? null); }}
-    onNavigateWeek={() => setView("week")}
-    onNavigateNotes={() => setView("notes")}
+    onNavigateToday={() => { setLocation("/"); setActiveId(todayTasks.find((task) => !task.done)?.id ?? todayTasks[0]?.id ?? null); }}
+    onNavigateWeek={() => setLocation("/this-week")}
+    onNavigateNotes={() => setLocation("/loose-notes")}
     onNavigateFocusHistory={() => setLocation("/focus-history")}
     onPreferencesClick={() => setPreferencesOpen(true)}
     ariaHidden={focusOpen}

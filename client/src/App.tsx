@@ -12,6 +12,8 @@ import Home from "./pages/Home";
 function Router() {
   return <Switch>
     <Route path="/" component={Home} />
+    <Route path="/this-week" component={Home} />
+    <Route path="/loose-notes" component={Home} />
     <Route path="/focus-history" component={FocusHistory} />
     <Route path="/404" component={NotFound} />
     <Route component={NotFound} />
