@@ -4,7 +4,7 @@ import { ArrowDownRight, ArrowUpRight, CalendarDays, Check, ChevronLeft, Chevron
 import { createTask as insertTask, deleteTask as removeTask, fetchTasks, updateTask as persistTask, type Energy, type Section, type Task, type TaskDraft } from "@/lib/tasks";
 import { createNote as insertNote, deleteNote as removeNote, fetchNotes, updateNote as persistNote, type Note, type NoteDraft } from "@/lib/notes";
 import { fetchDailyIntention, saveDailyIntention } from "@/lib/intentions";
-import { createFocusSession } from "@/lib/focusSessions";
+import { createFocusSession, type FocusSessionHistoryDraft } from "@/lib/focusSessions";
 import { getDefaultTaskMinutes } from "@/lib/preferences";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
@@ -16,6 +16,42 @@ type TaskErrors = Partial<Record<keyof TaskDraft, string>>;
 type FocusSession = { sessionId: string; taskId: string; durationSeconds: number; startAt: number; endAt: number; pausedAt: number | null; pausedRemainingSeconds: number | null; pausedSeconds: number; isRunning: boolean; completed: boolean; updatedAt: number };
 const LEGACY_FOCUS_KEY = "dayweave-focus-session";
 const focusStorageKey = (userId: string) => `dayweave-focus-session:${userId}`;
+const pendingFocusHistoryKey = (userId: string) => `dayweave-pending-focus-history:${userId}`;
+const savePendingFocusHistory = (userId: string, draft: FocusSessionHistoryDraft) => {
+  try {
+    const key = pendingFocusHistoryKey(userId);
+    const existing = localStorage.getItem(key);
+    if (existing) {
+      const existingDraft = JSON.parse(existing) as Partial<FocusSessionHistoryDraft>;
+      if (typeof existingDraft.completedAt === "string" && existingDraft.completedAt > draft.completedAt) return;
+    }
+    localStorage.setItem(key, JSON.stringify(draft));
+  } catch { /* Ignore storage failures; the completion warning remains visible. */ }
+};
+const loadPendingFocusHistory = (userId: string): FocusSessionHistoryDraft | null => {
+  try {
+    const stored = localStorage.getItem(pendingFocusHistoryKey(userId));
+    if (!stored) return null;
+    const draft = JSON.parse(stored) as Partial<FocusSessionHistoryDraft>;
+    if (typeof draft.sessionId !== "string" || typeof draft.taskTitle !== "string" || typeof draft.plannedDurationSeconds !== "number" || typeof draft.startedAt !== "string" || typeof draft.completedAt !== "string" || typeof draft.pausedSeconds !== "number" || (draft.taskId !== null && typeof draft.taskId !== "string") || (draft.taskDate !== null && typeof draft.taskDate !== "string")) {
+      localStorage.removeItem(pendingFocusHistoryKey(userId));
+      return null;
+    }
+    return draft as FocusSessionHistoryDraft;
+  } catch {
+    try { localStorage.removeItem(pendingFocusHistoryKey(userId)); } catch { /* Ignore storage failures. */ }
+    return null;
+  }
+};
+const removePendingFocusHistory = (userId: string, sessionId: string) => {
+  try {
+    const key = pendingFocusHistoryKey(userId);
+    const stored = localStorage.getItem(key);
+    if (!stored) return;
+    const draft = JSON.parse(stored) as Partial<FocusSessionHistoryDraft>;
+    if (draft.sessionId === sessionId) localStorage.removeItem(key);
+  } catch { /* Ignore storage failures. */ }
+};
 const DEFAULT_DAILY_INTENTION = "Make room for one thing that matters.";
 
 const padDatePart = (value: number) => String(value).padStart(2, "0");
@@ -292,6 +328,16 @@ export default function Home() {
     return () => { active = false; };
   }, [userId]);
   useEffect(() => {
+    if (!userId) return;
+    const pendingDraft = loadPendingFocusHistory(userId);
+    if (!pendingDraft) return;
+    void createFocusSession(userId, pendingDraft).then(() => {
+      removePendingFocusHistory(userId, pendingDraft.sessionId);
+    }).catch(() => {
+      // Leave the pending draft for a future authenticated load.
+    });
+  }, [userId]);
+  useEffect(() => {
     let active = true;
     setNotesLoading(true);
     setNotesError("");
@@ -540,7 +586,7 @@ export default function Home() {
   };
   const startFocus = (requestedTask?: Task) => { if (!userId) { setFocusSession(null); setFocusOpen(false); return; } const task = requestedTask && !requestedTask.done ? requestedTask : tasks.find((item) => !item.done); if (!task) { setFocusSession(null); setFocusOpen(true); return; } setActiveId(task.id); setFocusSession((current) => { const now = Date.now(); if (current?.taskId === task.id && !current.completed) return current.pausedAt !== null ? resumeFocusSession(current, now) : { ...current, isRunning: true, updatedAt: now }; const startAt = localDateTimeTimestamp(task.date, task.time); const endAt = startAt + task.minutes * 60 * 1000; return { sessionId: crypto.randomUUID(), taskId: task.id, durationSeconds: task.minutes * 60, startAt, endAt, pausedAt: null, pausedRemainingSeconds: null, pausedSeconds: 0, isRunning: true, completed: false, updatedAt: now }; }); setFocusOpen(true); };
   const exitFocus = () => { setFocusOpen(false); setFocusSession((current) => current ? pauseFocusSession(current) : null); };
-  const completeFocus = async () => { if (!focusSession || focusCompletionRef.current === focusSession.sessionId) return; const completedSession = focusSession; focusCompletionRef.current = completedSession.sessionId; const task = tasksRef.current.find((item) => item.id === completedSession.taskId); let historySaved = Boolean(userId); try { if (userId) await createFocusSession(userId, { sessionId: completedSession.sessionId, taskId: task?.id ?? null, taskTitle: task?.title ?? "Focus session", taskDate: task?.date ?? null, plannedDurationSeconds: completedSession.durationSeconds, startedAt: new Date(completedSession.startAt).toISOString(), completedAt: new Date().toISOString(), pausedSeconds: completedSession.pausedSeconds }); } catch { historySaved = false; } const taskCompleted = await toggleTask(completedSession.taskId); if (!taskCompleted) { focusCompletionRef.current = null; showToast("Task could not be completed. Please try again."); return; } setFocusOpen(false); setFocusSession(null); showToast(historySaved ? "Task completed" : "Task completed, but Focus History could not be saved."); };
+  const completeFocus = async () => { if (!focusSession || focusCompletionRef.current === focusSession.sessionId) return; const completedSession = focusSession; focusCompletionRef.current = completedSession.sessionId; const task = tasksRef.current.find((item) => item.id === completedSession.taskId); const historyDraft: FocusSessionHistoryDraft = { sessionId: completedSession.sessionId, taskId: task?.id ?? null, taskTitle: task?.title ?? "Focus session", taskDate: task?.date ?? null, plannedDurationSeconds: completedSession.durationSeconds, startedAt: new Date(completedSession.startAt).toISOString(), completedAt: new Date().toISOString(), pausedSeconds: completedSession.pausedSeconds }; let historySaved = Boolean(userId); try { if (userId) { await createFocusSession(userId, historyDraft); removePendingFocusHistory(userId, historyDraft.sessionId); } } catch { historySaved = false; if (userId) savePendingFocusHistory(userId, historyDraft); } const taskCompleted = await toggleTask(completedSession.taskId); if (!taskCompleted) { focusCompletionRef.current = null; showToast("Task could not be completed. Please try again."); return; } setFocusOpen(false); setFocusSession(null); showToast(historySaved ? "Task completed" : "Task completed, but Focus History could not be saved."); };
   const taskBeingEdited = editingId ? tasks.find((task) => task.id === editingId) : undefined;
   const taskDateLockReason = taskModal === "edit" ? getTaskDateLockReason(taskBeingEdited, focusSession, currentDate) : null;
   return <DayweaveShell

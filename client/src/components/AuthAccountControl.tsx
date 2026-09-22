@@ -36,7 +36,10 @@ export default function AuthAccountControl({ section }: { section?: string }) {
   const logout = async () => {
     setError("");
     const result = await signOut();
-    if (result.error) setError(result.error.message);
+    if (result.error) {
+      console.error("[Dayweave] Unable to sign out.", result.error);
+      setError("Unable to sign out. Please try again.");
+    }
   };
 
   return <div ref={controlRef} className="auth-account-control" data-user-id={userId ?? undefined}>
