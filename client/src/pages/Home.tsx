@@ -77,11 +77,11 @@ function validateTaskDraft(draft: TaskDraft): TaskErrors {
   return errors;
 }
 
-function TaskForm({ mode, initial, today, dateLockedMessage, onSave, onCancel, onRequestDelete, deleteConfirm, onConfirmDelete, onCancelDelete }: { mode: "create" | "edit"; initial: TaskDraft; today: string; dateLockedMessage: string | null; onSave: (draft: TaskDraft) => void; onCancel: () => void; onRequestDelete?: () => void; deleteConfirm?: boolean; onConfirmDelete?: () => void; onCancelDelete?: () => void }) {
+function TaskForm({ mode, initial, today, dateLockedMessage, isSubmitting, onSave, onCancel, onRequestDelete, deleteConfirm, onConfirmDelete, onCancelDelete }: { mode: "create" | "edit"; initial: TaskDraft; today: string; dateLockedMessage: string | null; isSubmitting: boolean; onSave: (draft: TaskDraft) => void; onCancel: () => void; onRequestDelete?: () => void; deleteConfirm?: boolean; onConfirmDelete?: () => void; onCancelDelete?: () => void }) {
   const [draft, setDraft] = useState<TaskDraft>(initial);
   const [errors, setErrors] = useState<TaskErrors>({});
   const update = <K extends keyof TaskDraft>(key: K, value: TaskDraft[K]) => { setDraft((current) => ({ ...current, [key]: value })); setErrors((current) => ({ ...current, [key]: undefined })); };
-  const submit = (event: React.FormEvent) => { event.preventDefault(); const nextErrors = validateTaskDraft(draft); const dateError = getTaskDateError(mode, draft.date, today, initial.date, dateLockedMessage); if (dateError) nextErrors.date = dateError; if (Object.keys(nextErrors).length) { setErrors(nextErrors); return; } onSave({ ...draft, title: draft.title.trim(), note: draft.note.trim() || "A small, clear next step." }); };
+  const submit = (event: React.FormEvent) => { event.preventDefault(); if (isSubmitting) return; const nextErrors = validateTaskDraft(draft); const dateError = getTaskDateError(mode, draft.date, today, initial.date, dateLockedMessage); if (dateError) nextErrors.date = dateError; if (Object.keys(nextErrors).length) { setErrors(nextErrors); return; } onSave({ ...draft, title: draft.title.trim(), note: draft.note.trim() || "A small, clear next step." }); };
   return <form className="task-form" onSubmit={submit} noValidate>
     <div className="task-form-heading"><div><span className="eyebrow accent"><Pencil size={12} /> {mode === "edit" ? "EDIT TASK" : "SHAPE TASK"}</span><h2 id="task-form-title">{mode === "edit" ? "Tune the details" : "Give it a place"}</h2><p>{mode === "edit" ? "Small adjustments keep the route honest." : "Add just enough detail to make this easy to return to."}</p></div><button type="button" className="close-modal" onClick={onCancel} aria-label="Close task form"><X size={18} /></button></div>
     <div className="form-fields">
@@ -94,7 +94,7 @@ function TaskForm({ mode, initial, today, dateLockedMessage, onSave, onCancel, o
       <label className="form-field full"><span>Date</span><input type="date" value={draft.date} min={today} disabled={Boolean(dateLockedMessage)} aria-invalid={Boolean(errors.date)} aria-describedby={dateLockedMessage || errors.date ? "task-date-help" : undefined} onChange={(event) => update("date", event.target.value)} />{(dateLockedMessage || errors.date) && <small id="task-date-help" className={errors.date ? "field-error" : "mt-1 block text-[10px] text-[#758683]"}>{errors.date ?? dateLockedMessage}</small>}</label>
     </div>
     {deleteConfirm && <div className="delete-confirm"><div className="delete-icon"><Trash2 size={17} /></div><div><strong>Delete this task?</strong><p>This can’t be undone.</p></div><div className="delete-actions"><button type="button" className="cancel-delete" onClick={onCancelDelete}>Keep it</button><button type="button" className="confirm-delete" onClick={onConfirmDelete}>Delete</button></div></div>}
-    <div className="task-form-footer">{mode === "edit" ? <button type="button" className="delete-trigger" onClick={onRequestDelete}><Trash2 size={15} /> Delete task</button> : <span className="required-note"><b>*</b> Required</span>}<div className="form-actions"><button type="button" className="secondary-action" onClick={onCancel}>Cancel</button><button className="primary-action" type="submit"><Save size={15} /> {mode === "edit" ? "Save changes" : "Add to route"}</button></div></div>
+    <div className="task-form-footer">{mode === "edit" ? <button type="button" className="delete-trigger" onClick={onRequestDelete}><Trash2 size={15} /> Delete task</button> : <span className="required-note"><b>*</b> Required</span>}<div className="form-actions"><button type="button" className="secondary-action" onClick={onCancel}>Cancel</button><button className="primary-action" type="submit" disabled={isSubmitting}><Save size={15} /> {mode === "edit" ? "Save changes" : "Add to route"}</button></div></div>
   </form>;
 }
 
@@ -241,7 +241,7 @@ export default function Home() {
   const visibleIntention = intentionLoadedKey === intentionKey ? intention : DEFAULT_DAILY_INTENTION;
   const visibleIntentionSaveStatus = intentionLoadedKey === intentionKey && intentionSaveStatus?.key === intentionKey && intentionSaveStatus.editVersion === intentionEditVersion.current ? intentionSaveStatus.status : null;
   const [view, setView] = useState<"today" | "week" | "notes">("today"); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(() => loadFocusSession()); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [taskModal, setTaskModal] = useState<"create" | "edit" | null>(null); const [formDraft, setFormDraft] = useState<TaskDraft>(() => makeDefaultTaskDraft(localDateString())); const [editingId, setEditingId] = useState<string | null>(null); const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [taskModal, setTaskModal] = useState<"create" | "edit" | null>(null); const [formDraft, setFormDraft] = useState<TaskDraft>(() => makeDefaultTaskDraft(localDateString())); const [editingId, setEditingId] = useState<string | null>(null); const [deleteConfirm, setDeleteConfirm] = useState(false); const [taskSavePending, setTaskSavePending] = useState(false); const taskSaveInFlight = useRef(false);
   const [noteModal, setNoteModal] = useState<"create" | "edit" | null>(null); const [noteDraft, setNoteDraft] = useState<NoteDraft>({ title: "", body: "" }); const [editingNoteId, setEditingNoteId] = useState<string | null>(null); const [noteDeleteConfirm, setNoteDeleteConfirm] = useState(false);
   const focusCompletionRef = useRef<string | null>(null);
   useEffect(() => { setMenuOpen(false); }, [view]);
@@ -424,6 +424,7 @@ export default function Home() {
   const openCreate = (title = "", date = currentDate) => { const allowedDate = date < currentDate ? currentDate : date; setFormDraft({ ...makeDefaultTaskDraft(allowedDate), title, date: allowedDate }); setEditingId(null); setDeleteConfirm(false); setTaskModal("create"); setNewTask(""); };
   const openEdit = (task: Task) => { setFormDraft({ title: task.title, note: task.note, time: task.time, minutes: task.minutes, energy: task.energy, section: task.section, date: task.date }); setEditingId(task.id); setDeleteConfirm(false); setTaskModal("edit"); };
   const saveTask = (draft: TaskDraft) => {
+    if (taskSaveInFlight.current) return;
     if (!userId || tasksLoading) { showToast("Sign in to save tasks."); return; }
     const targetId = taskModal === "edit" ? editingId : null;
     const mode = targetId === null ? "create" : "edit";
@@ -442,13 +443,15 @@ export default function Home() {
     if (targetId !== null && !initialTask) return;
     const initialDraft = prepareDraft(draft, initialTask, localDateString());
     if (!initialDraft) return;
+    taskSaveInFlight.current = true;
+    setTaskSavePending(true);
     void queueTaskMutation(async () => {
-      if (userIdRef.current !== userId) return;
-      const queuedTask = targetId === null ? undefined : tasksRef.current.find((task) => task.id === targetId);
-      if (targetId !== null && !queuedTask) return;
-      const queuedDraft = prepareDraft(initialDraft, queuedTask, localDateString());
-      if (!queuedDraft) return;
       try {
+        if (userIdRef.current !== userId) return;
+        const queuedTask = targetId === null ? undefined : tasksRef.current.find((task) => task.id === targetId);
+        if (targetId !== null && !queuedTask) return;
+        const queuedDraft = prepareDraft(initialDraft, queuedTask, localDateString());
+        if (!queuedDraft) return;
         if (targetId !== null) {
           const updated = await persistTask(userId, targetId, queuedDraft);
           if (userIdRef.current === userId) { replaceTasks((items) => items.map((task) => task.id === targetId ? updated : task)); showToast("Task details saved"); }
@@ -458,6 +461,7 @@ export default function Home() {
         }
         if (userIdRef.current === userId) { setTaskModal(null); setEditingId(null); setDeleteConfirm(false); }
       } catch (error) { setToast(error instanceof Error ? `Task save failed: ${error.message}` : "Task save failed. Please try again."); }
+      finally { taskSaveInFlight.current = false; setTaskSavePending(false); }
     });
   };
   const deleteTask = () => {
@@ -544,7 +548,7 @@ export default function Home() {
     topActions={<div className="top-actions"><button className="icon-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="More options"><MoreHorizontal size={19} /></button>{menuOpen && <div className="pop-menu"><button onClick={() => { setMenuOpen(false); showToast("A blank day is a brave start"); }}>Clear the day</button><button onClick={() => { setMenuOpen(false); showToast("Share link copied"); }}>Share view</button></div>}<button className="focus-button" onClick={() => startFocus(selectedTask)}><Play size={15} fill="currentColor" /> Focus mode</button></div>}
     afterMain={<>
       {focusOpen && <FocusMode task={focusTask} session={focusSession} setSession={setFocusSession} onComplete={completeFocus} onExit={exitFocus} onAddTask={() => { setFocusOpen(false); setFocusSession(null); setView("today"); openCreate(); }} onReturnToday={() => { setFocusOpen(false); setFocusSession(null); setView("today"); }} />}
-      {taskModal && <div className="modal-backdrop task-modal-backdrop" onClick={() => setTaskModal(null)}><div className="task-form-modal" role="dialog" aria-modal="true" aria-labelledby="task-form-title" onClick={(event) => event.stopPropagation()}><TaskForm mode={taskModal} initial={formDraft} today={currentDate} dateLockedMessage={taskDateLockReason} onSave={saveTask} onCancel={() => setTaskModal(null)} onRequestDelete={() => setDeleteConfirm(true)} deleteConfirm={deleteConfirm} onConfirmDelete={deleteTask} onCancelDelete={() => setDeleteConfirm(false)} /></div></div>}
+      {taskModal && <div className="modal-backdrop task-modal-backdrop" onClick={() => setTaskModal(null)}><div className="task-form-modal" role="dialog" aria-modal="true" aria-labelledby="task-form-title" onClick={(event) => event.stopPropagation()}><TaskForm mode={taskModal} initial={formDraft} today={currentDate} dateLockedMessage={taskDateLockReason} isSubmitting={taskSavePending} onSave={saveTask} onCancel={() => setTaskModal(null)} onRequestDelete={() => setDeleteConfirm(true)} deleteConfirm={deleteConfirm} onConfirmDelete={deleteTask} onCancelDelete={() => setDeleteConfirm(false)} /></div></div>}
       {noteModal && <div className="modal-backdrop task-modal-backdrop" onClick={() => setNoteModal(null)}><div className="task-form-modal note-form-modal" role="dialog" aria-modal="true" aria-labelledby="note-form-title" onClick={(event) => event.stopPropagation()}><NoteForm mode={noteModal} initial={noteDraft} onSave={saveNote} onCancel={() => setNoteModal(null)} onRequestDelete={() => setNoteDeleteConfirm(true)} deleteConfirm={noteDeleteConfirm} onConfirmDelete={deleteNote} onCancelDelete={() => setNoteDeleteConfirm(false)} /></div></div>}
       {toast && <div className="toast" role="status" aria-live="polite"><Check size={16} /> {toast}</div>}
       <PreferencesDialog open={preferencesOpen} onOpenChange={setPreferencesOpen} />
