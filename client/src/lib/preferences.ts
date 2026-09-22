@@ -4,7 +4,9 @@ export type Preferences = {
 
 const PREFERENCES_KEY = "dayweave-preferences";
 const DEFAULT_PREFERENCES: Preferences = { defaultTaskMinutes: 30 };
-const ALLOWED_TASK_DURATIONS = new Set([15, 30, 45, 60]);
+const isValidTaskDuration = (minutes: unknown): minutes is number => (
+  typeof minutes === "number" && Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440 && minutes % 5 === 0
+);
 
 function normalizePreferences(value: unknown): Preferences {
   if (typeof value !== "object" || value === null || !("defaultTaskMinutes" in value)) {
@@ -13,7 +15,7 @@ function normalizePreferences(value: unknown): Preferences {
 
   const minutes = value.defaultTaskMinutes;
   return {
-    defaultTaskMinutes: typeof minutes === "number" && ALLOWED_TASK_DURATIONS.has(minutes)
+    defaultTaskMinutes: isValidTaskDuration(minutes)
       ? minutes
       : DEFAULT_PREFERENCES.defaultTaskMinutes,
   };

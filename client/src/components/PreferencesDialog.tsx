@@ -16,20 +16,58 @@ interface PreferencesDialogProps {
 }
 
 const durationOptions = [15, 30, 45, 60] as const;
+const isPresetDuration = (minutes: number): minutes is (typeof durationOptions)[number] => durationOptions.includes(minutes as (typeof durationOptions)[number]);
+const isValidCustomDuration = (value: string) => {
+  const minutes = Number(value.trim());
+  return Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440 && minutes % 5 === 0;
+};
 
 export function PreferencesDialog({ open, onOpenChange }: PreferencesDialogProps) {
   const [defaultTaskMinutes, setSelectedDuration] = useState(getDefaultTaskMinutes);
+  const [customMinutes, setCustomMinutes] = useState("");
+  const [customError, setCustomError] = useState("");
 
   useEffect(() => {
     if (open) {
-      setSelectedDuration(getDefaultTaskMinutes());
+      const minutes = getDefaultTaskMinutes();
+      setSelectedDuration(minutes);
+      setCustomMinutes(String(minutes));
+      setCustomError("");
     }
   }, [open]);
 
   const handleDurationChange = (value: string) => {
     const minutes = Number(value);
-    if (!durationOptions.includes(minutes as (typeof durationOptions)[number])) return;
+    if (value === "custom") {
+      setSelectedDuration(isPresetDuration(defaultTaskMinutes) ? 0 : defaultTaskMinutes);
+      if (isPresetDuration(defaultTaskMinutes)) setCustomMinutes("");
+      setCustomError("");
+      return;
+    }
+    if (!isPresetDuration(minutes)) return;
 
+    setSelectedDuration(minutes);
+    setDefaultTaskMinutes(minutes);
+    setCustomError("");
+  };
+
+  const handleCustomMinutesChange = (value: string) => {
+    setCustomMinutes(value);
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setCustomError("Enter a duration from 1 to 1,440 minutes.");
+      return;
+    }
+    const minutes = Number(trimmed);
+    if (Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440 && minutes % 5 !== 0) {
+      setCustomError("Choose a duration in 5-minute increments.");
+      return;
+    }
+    if (!isValidCustomDuration(trimmed)) {
+      setCustomError("Enter a whole number from 1 to 1,440 minutes.");
+      return;
+    }
+    setCustomError("");
     setSelectedDuration(minutes);
     setDefaultTaskMinutes(minutes);
   };
@@ -52,7 +90,7 @@ export function PreferencesDialog({ open, onOpenChange }: PreferencesDialogProps
           </h2>
           <RadioGroup
             aria-label="Default task duration"
-            value={String(defaultTaskMinutes)}
+            value={isPresetDuration(defaultTaskMinutes) ? String(defaultTaskMinutes) : "custom"}
             onValueChange={handleDurationChange}
             className="grid grid-cols-2 gap-2 sm:grid-cols-4"
           >
@@ -79,7 +117,29 @@ export function PreferencesDialog({ open, onOpenChange }: PreferencesDialogProps
                 </label>
               );
             })}
+            <label
+              htmlFor="default-task-duration-custom"
+              className={`col-span-2 flex min-w-0 cursor-pointer items-center justify-center gap-1 rounded-xl border px-3 py-3 text-sm transition-colors focus-within:ring-2 focus-within:ring-[#6f7f63]/40 sm:col-span-1 ${
+                !isPresetDuration(defaultTaskMinutes)
+                  ? "border-[#89967b] bg-[#f1f3ec] text-[#303b2d]"
+                  : "border-[#e8e5dd] bg-[#fffefa] text-[#55564f] hover:border-[#c9cdbf]"
+              }`}
+            >
+              <RadioGroupItem
+                id="default-task-duration-custom"
+                value="custom"
+                className="border-[#9a9b91] text-[#657458] shadow-none [&_[data-slot=radio-group-indicator]>svg]:fill-[#657458] [&_[data-slot=radio-group-indicator]>svg]:stroke-[#657458]"
+              />
+              <span className="whitespace-nowrap">Custom</span>
+            </label>
           </RadioGroup>
+          {!isPresetDuration(defaultTaskMinutes) && (
+            <div className="mt-3 grid gap-2">
+              <label htmlFor="custom-task-duration" className="text-sm font-medium text-[#343632]">Custom minutes</label>
+              <input id="custom-task-duration" type="number" min="1" max="1440" step="5" inputMode="numeric" value={customMinutes} onChange={(event) => handleCustomMinutesChange(event.target.value)} className="min-h-11 rounded-lg border border-[#cfd8cf] bg-[#fffdf7] px-3 text-[#283b3e] outline-none focus:border-[#89967b] focus:ring-2 focus:ring-[#6f7f63]/30" aria-invalid={Boolean(customError)} aria-describedby={customError ? "custom-task-duration-error" : undefined} />
+              {customError && <p id="custom-task-duration-error" className="m-0 text-sm text-[#b86648]" role="alert">{customError}</p>}
+            </div>
+          )}
         </section>
       </DialogContent>
     </Dialog>
