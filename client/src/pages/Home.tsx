@@ -328,7 +328,7 @@ export default function Home() {
       if (!active) return;
       const message = taskErrorMessage("load", error);
       setTasksError(message);
-      setToast(message);
+      showToast(message);
     }).finally(() => { if (active) setTasksLoading(false); });
     return () => { active = false; };
   }, [userId]);
@@ -612,7 +612,6 @@ export default function Home() {
     onNavigateFocusHistory={() => setLocation("/focus-history")}
     onPreferencesClick={() => setPreferencesOpen(true)}
     ariaHidden={focusOpen}
-    beforeMobileNav={(tasksLoading || tasksError) && <p role={tasksLoading ? "status" : "alert"}>{tasksLoading ? "Loading your tasks…" : `Tasks could not be loaded: ${tasksError}`}</p>}
     topActions={<div className="top-actions"><button className="icon-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="More options"><MoreHorizontal size={19} /></button>{menuOpen && <div className="pop-menu"><button onClick={() => { setMenuOpen(false); showToast("A blank day is a brave start"); }}>Clear the day</button><button onClick={() => { setMenuOpen(false); showToast("Share link copied"); }}>Share view</button></div>}<button className="focus-button" onClick={() => startFocus(selectedTask)}><Play size={15} fill="currentColor" /> Focus mode</button></div>}
     afterMain={<>
       {focusOpen && <FocusMode task={focusTask} session={focusSession} setSession={setFocusSession} onComplete={completeFocus} onExit={exitFocus} onAddTask={() => { setFocusOpen(false); setFocusSession(null); setView("today"); openCreate(); }} onReturnToday={() => { setFocusOpen(false); setFocusSession(null); setView("today"); }} />}
