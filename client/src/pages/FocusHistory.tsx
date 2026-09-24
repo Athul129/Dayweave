@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFocusSessions, type FocusSessionHistory } from "@/lib/focusSessions";
 import DayweaveShell from "@/components/DayweaveShell";
@@ -39,6 +39,15 @@ function formatGroupDate(date: Date, today: Date, yesterday: Date): string {
   }).format(date);
 }
 
+type HistoryPeriod = "all" | "week" | "month";
+
+function mondayKey(date: Date): string {
+  const monday = new Date(date);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  return localDateKey(monday);
+}
+
 export default function FocusHistory() {
   const [, setLocation] = useLocation();
   const { userId } = useAuth();
@@ -48,6 +57,7 @@ export default function FocusHistory() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [period, setPeriod] = useState<HistoryPeriod>("all");
 
   useEffect(() => {
     let active = true;
@@ -80,9 +90,27 @@ export default function FocusHistory() {
   }, [userId, loadAttempt]);
 
   const today = new Date();
+  const todayKey = localDateKey(today);
+  const filteredSessions = useMemo(() => {
+    if (period === "all") return sessions;
+    if (period === "month") {
+      return sessions.filter((session) => {
+        const completedAt = new Date(session.completedAt);
+        return completedAt.getFullYear() === today.getFullYear() && completedAt.getMonth() === today.getMonth();
+      });
+    }
+    const weekStart = mondayKey(today);
+    const weekEndDate = new Date(today);
+    weekEndDate.setDate(weekEndDate.getDate() + (6 - ((today.getDay() + 6) % 7)));
+    const weekEnd = localDateKey(weekEndDate);
+    return sessions.filter((session) => {
+      const completedKey = localDateKey(new Date(session.completedAt));
+      return completedKey >= weekStart && completedKey <= weekEnd;
+    });
+  }, [period, sessions, todayKey]);
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  const groupedSessions = sessions.reduce<Array<{ key: string; label: string; sessions: FocusSessionHistory[] }>>(
+  const groupedSessions = filteredSessions.reduce<Array<{ key: string; label: string; sessions: FocusSessionHistory[] }>>(
     (groups, session) => {
       const completedAt = new Date(session.completedAt);
       const key = localDateKey(completedAt);
@@ -96,9 +124,9 @@ export default function FocusHistory() {
     },
     [],
   );
-  const completedSessions = sessions.length;
-  const totalPlannedSeconds = sessions.reduce((total, session) => total + session.plannedDurationSeconds, 0);
-  const totalPausedSeconds = sessions.reduce((total, session) => total + session.pausedSeconds, 0);
+  const completedSessions = filteredSessions.length;
+  const totalPlannedSeconds = filteredSessions.reduce((total, session) => total + session.plannedDurationSeconds, 0);
+  const totalPausedSeconds = filteredSessions.reduce((total, session) => total + session.pausedSeconds, 0);
   const sidebarDate = new Intl.DateTimeFormat("en-US", {
     weekday: "short",
     month: "short",
@@ -128,7 +156,23 @@ export default function FocusHistory() {
         </div>
       </section>
 
-      {!loading && !error && sessions.length > 0 && (
+      <div className="mx-auto mt-6 flex max-w-3xl items-center justify-end">
+        <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.08em] text-[#87918e]">
+          <span>Show</span>
+          <select
+            className="rounded-lg border border-[#dfe3dc] bg-[#fffdf7] px-3 py-2 text-xs font-semibold normal-case tracking-normal text-[#53666a] outline-none focus:border-[#89967b]"
+            value={period}
+            onChange={(event) => setPeriod(event.target.value as HistoryPeriod)}
+            aria-label="Filter Focus History by period"
+          >
+            <option value="all">All time</option>
+            <option value="week">This week</option>
+            <option value="month">This month</option>
+          </select>
+        </label>
+      </div>
+
+      {!loading && !error && filteredSessions.length > 0 && (
         <section aria-label="Focus history summary" className="mx-auto mt-7 grid max-w-3xl grid-cols-3 divide-x divide-[#dfe3dc] rounded-xl border border-[#e1e3da] bg-[#fffdf7] px-2 py-4 shadow-[2px_3px_0_#e8e4d9] sm:mt-8 sm:px-5 sm:py-5">
           <div className="min-w-0 px-2 sm:px-4">
             <span className="block text-[9px] font-bold uppercase tracking-[.1em] text-[#87918e] sm:text-[10px]">Completed</span>
@@ -172,7 +216,7 @@ export default function FocusHistory() {
               Retry
             </button>
           </div>
-        ) : sessions.length === 0 ? (
+        ) : filteredSessions.length === 0 ? (
           <p className="rounded-xl border border-[#dfe3dc] bg-[#fffdf7] px-5 py-6 text-sm text-[#647679] shadow-[2px_3px_0_#e8e4d9]">No completed focus sessions yet.</p>
         ) : (
           <div className="space-y-8">
