@@ -415,7 +415,7 @@ export default function Home() {
       setIntention(DEFAULT_DAILY_INTENTION);
       setIntentionLoadedKey(key);
       
-      setToast("Your daily intention could not be loaded. Please try again.");
+      showToast("Your daily intention could not be loaded. Please try again.");
     }).finally(() => {
       if (active && sequence === intentionLoadSequence.current) setIntentionLoading(false);
     });
