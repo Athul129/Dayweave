@@ -667,15 +667,15 @@ export default function Home() {
             </section>
             <section aria-labelledby="reflection-today-heading">
               <h2 id="reflection-today-heading" className="mb-3 text-xs font-bold uppercase tracking-[.1em] text-[#87918e]">Today</h2>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <div className="rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{completed}</strong><span className="text-xs text-[#647679]">completed</span></div>
-                <div className="rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayRemaining.length}</strong><span className="text-xs text-[#647679]">remaining</span></div>
-                <div className="rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayPlannedMinutes} min</strong><span className="text-xs text-[#647679]">planned</span></div>
+              <div className="reflection-today-metrics grid gap-2 sm:grid-cols-3">
+                <div className="reflection-metric rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{completed}</strong><span className="text-xs text-[#647679]">completed</span></div>
+                <div className="reflection-metric rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayRemaining.length}</strong><span className="text-xs text-[#647679]">remaining</span></div>
+                <div className="reflection-metric reflection-planned-metric rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayPlannedMinutes} min</strong><span className="text-xs text-[#647679]">planned</span></div>
               </div>
             </section>
             <section aria-labelledby="reflection-focus-heading">
               <h2 id="reflection-focus-heading" className="mb-3 text-xs font-bold uppercase tracking-[.1em] text-[#87918e]">Focus</h2>
-              {focusHistoryLoading ? <p className="m-0 text-sm text-[#647679]" role="status">Focus summary loading…</p> : focusHistoryError ? <p className="m-0 text-sm text-[#647679]" role="status">Focus summary unavailable right now.</p> : <div className="grid gap-2 sm:grid-cols-2"><div className="rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayFocusSessions.length}</strong><span className="text-xs text-[#647679]">completed {todayFocusSessions.length === 1 ? "session" : "sessions"}</span></div><div className="rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayPlannedFocusMinutes} min</strong><span className="text-xs text-[#647679]">planned focus</span></div></div>}
+              {focusHistoryLoading ? <p className="m-0 text-sm text-[#647679]" role="status">Focus summary loading…</p> : focusHistoryError ? <p className="m-0 text-sm text-[#647679]" role="status">Focus summary unavailable right now.</p> : <div className="reflection-focus-metrics grid gap-2 sm:grid-cols-2"><div className="reflection-metric rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayFocusSessions.length}</strong><span className="text-xs text-[#647679]">completed {todayFocusSessions.length === 1 ? "session" : "sessions"}</span></div><div className="reflection-metric rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayPlannedFocusMinutes} min</strong><span className="text-xs text-[#647679]">planned focus</span></div></div>}
             </section>
             <p className="m-0 border-t border-[#e1e3da] pt-5 text-center font-[Fraunces,serif] text-lg italic text-[#53666a]">Notice what moved today.</p>
           </div>
