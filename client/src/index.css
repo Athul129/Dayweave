@@ -246,6 +246,29 @@
 .reflection-copy > p,
 .reflection-copy > button { color: #4f625b; }
 
+.reflection-narrative,
+.reflection-focus-summary { margin:0 0 14px; color:#53666a; font-size:14px; line-height:1.5; }
+.reflection-today-metrics,
+.reflection-focus-metrics { display:flex; flex-wrap:wrap; gap:0; }
+.reflection-metric { display:flex; flex:1 1 0; min-width:0; align-items:center; gap:8px; padding:9px 14px 9px 0; }
+.reflection-metric + .reflection-metric { padding-left:14px; border-left:1px solid #e1e3da; }
+.reflection-metric strong { display:flex; align-items:center; gap:7px; color:#1d2d35; font-size:18px; font-weight:600; white-space:nowrap; }
+.reflection-metric strong svg { color:#718f78; }
+.reflection-metric span { color:#647679; font-size:12px; }
+.reflection-focus-empty { display:flex; flex-direction:column; gap:3px; padding:14px 16px; border-radius:12px; background:#f3f2ed; color:#53666a; font-size:13px; line-height:1.45; }
+.reflection-focus-empty strong { color:#1d2d35; font-weight:600; }
+.reflection-before { border-top:1px solid #e1e3da; padding-top:20px; }
+.reflection-inputs { display:grid; gap:8px; }
+.reflection-inputs label { color:#1d2d35; font-size:13px; font-weight:600; }
+.reflection-inputs textarea { width:100%; resize:vertical; border:1px solid #dfe2d9; border-radius:11px; padding:11px 13px; color:#292d3b; background:#fffdfa; font:inherit; font-size:13px; line-height:1.5; outline:none; }
+.reflection-inputs textarea::placeholder { color:#89928f; }
+.reflection-inputs textarea:focus { border-color:#9caf9f; box-shadow:0 0 0 3px #dce8dd; }
+.reflection-closing { display:flex; align-items:center; justify-content:space-between; gap:16px; border-top:1px solid #e1e3da; padding-top:18px; }
+.reflection-closing p { margin:0; color:#53666a; font:italic 16px/1.4 Fraunces,serif; }
+.reflection-closing button { display:inline-flex; align-items:center; gap:5px; flex:none; border-radius:8px; padding:10px 16px; color:#fffaf0; background:#a97614; font-size:12px; font-weight:700; }
+.reflection-closing button:hover { background:#8d6110; }
+@media (max-width:740px) { .reflection-today-metrics,.reflection-focus-metrics { display:flex; flex-wrap:wrap; gap:0; } .reflection-metric { flex:0 0 auto; padding:0 10px 0 0; } .reflection-metric + .reflection-metric { padding-left:10px; } .reflection-planned-metric { flex-basis:100%; margin-top:7px; padding-left:0!important; border-left:0!important; } .reflection-closing { align-items:stretch; flex-direction:column; gap:12px; } .reflection-closing button { justify-content:center; width:100%; } }
+
 /* Accessibility audit fixes: keep secondary labels readable on the pale rail, paper cards, and weekly surfaces. */
 .rail-date > .eyebrow,
 .rail-link,

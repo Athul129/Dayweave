@@ -304,7 +304,7 @@ export default function Home() {
   const intentionKey = userId ? `${userId}:${currentDate}` : ""; const intentionKeyRef = useRef(intentionKey); intentionKeyRef.current = intentionKey;
   const visibleIntention = intentionLoadedKey === intentionKey ? intention : DEFAULT_DAILY_INTENTION;
   const visibleIntentionSaveStatus = intentionLoadedKey === intentionKey && intentionSaveStatus?.key === intentionKey && intentionSaveStatus.editVersion === intentionEditVersion.current ? intentionSaveStatus.status : null;
-  const [view, setView] = useState<"today" | "week" | "notes">(() => viewForPath(location)); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(null); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const previousFocusUserId = useRef(userId); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const toastTimerRef = useRef<number | null>(null); const [preferencesOpen, setPreferencesOpen] = useState(false); const [reflectionOpen, setReflectionOpen] = useState(false);
+  const [view, setView] = useState<"today" | "week" | "notes">(() => viewForPath(location)); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(null); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const previousFocusUserId = useRef(userId); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const toastTimerRef = useRef<number | null>(null); const [preferencesOpen, setPreferencesOpen] = useState(false); const [reflectionOpen, setReflectionOpen] = useState(false); const [reflectionWentWell, setReflectionWentWell] = useState(""); const [reflectionCarryForward, setReflectionCarryForward] = useState("");
   const [taskModal, setTaskModal] = useState<"create" | "edit" | null>(null); const [formDraft, setFormDraft] = useState<TaskDraft>(() => makeDefaultTaskDraft(localDateString())); const [editingId, setEditingId] = useState<string | null>(null); const [deleteConfirm, setDeleteConfirm] = useState(false); const [taskSavePending, setTaskSavePending] = useState(false); const taskSaveInFlight = useRef(false);
   const [noteModal, setNoteModal] = useState<"create" | "edit" | null>(null); const [noteDraft, setNoteDraft] = useState<NoteDraft>({ title: "", body: "" }); const [editingNoteId, setEditingNoteId] = useState<string | null>(null); const [noteDeleteConfirm, setNoteDeleteConfirm] = useState(false);
   const focusCompletionRef = useRef<string | null>(null);
@@ -666,18 +666,28 @@ export default function Home() {
               <p className="mt-3 mb-0 font-[Fraunces,serif] text-xl leading-snug text-[#1d2d35]">{visibleIntention || "No intention set today."}</p>
             </section>
             <section aria-labelledby="reflection-today-heading">
-              <h2 id="reflection-today-heading" className="mb-3 text-xs font-bold uppercase tracking-[.1em] text-[#87918e]">Today</h2>
+              <h2 id="reflection-today-heading" className="mb-3 text-xs font-bold uppercase tracking-[.1em] text-[#87918e]">Your day</h2>
+              <p className="reflection-narrative">{completed > 0 ? "You made some movement today." : todayTasks.length > 0 ? "You gave today some shape." : "Today is still open."}</p>
               <div className="reflection-today-metrics grid gap-2 sm:grid-cols-3">
-                <div className="reflection-metric rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{completed}</strong><span className="text-xs text-[#647679]">completed</span></div>
-                <div className="reflection-metric rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayRemaining.length}</strong><span className="text-xs text-[#647679]">remaining</span></div>
-                <div className="reflection-metric reflection-planned-metric rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayPlannedMinutes} min</strong><span className="text-xs text-[#647679]">planned</span></div>
+                <div className="reflection-metric"><strong><Check size={16} aria-hidden="true" />{completed}</strong><span>task{completed === 1 ? "" : "s"} completed</span></div>
+                <div className="reflection-metric"><strong><ArrowDownRight size={16} aria-hidden="true" />{todayRemaining.length}</strong><span>task{todayRemaining.length === 1 ? "" : "s"} remaining</span></div>
+                <div className="reflection-metric reflection-planned-metric"><strong><Clock3 size={16} aria-hidden="true" />{todayPlannedMinutes} min</strong><span>planned</span></div>
               </div>
             </section>
             <section aria-labelledby="reflection-focus-heading">
               <h2 id="reflection-focus-heading" className="mb-3 text-xs font-bold uppercase tracking-[.1em] text-[#87918e]">Focus</h2>
-              {focusHistoryLoading ? <p className="m-0 text-sm text-[#647679]" role="status">Focus summary loading…</p> : focusHistoryError ? <p className="m-0 text-sm text-[#647679]" role="status">Focus summary unavailable right now.</p> : <div className="reflection-focus-metrics grid gap-2 sm:grid-cols-2"><div className="reflection-metric rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayFocusSessions.length}</strong><span className="text-xs text-[#647679]">completed {todayFocusSessions.length === 1 ? "session" : "sessions"}</span></div><div className="reflection-metric rounded-xl border border-[#e1e3da] bg-white/60 p-3"><strong className="block text-lg text-[#1d2d35]">{todayPlannedFocusMinutes} min</strong><span className="text-xs text-[#647679]">planned focus</span></div></div>}
+              {focusHistoryLoading ? <p className="m-0 text-sm text-[#647679]" role="status">Focus summary loading…</p> : focusHistoryError ? <p className="m-0 text-sm text-[#647679]" role="status">Focus summary unavailable right now.</p> : todayFocusSessions.length ? <p className="reflection-focus-summary">{todayFocusSessions.length} {todayFocusSessions.length === 1 ? "session" : "sessions"} · {todayPlannedFocusMinutes} min planned</p> : <div className="reflection-focus-empty"><strong>No focus sessions today.</strong><span>That&apos;s okay. Every day looks different.</span></div>}
             </section>
-            <p className="m-0 border-t border-[#e1e3da] pt-5 text-center font-[Fraunces,serif] text-lg italic text-[#53666a]">Notice what moved today.</p>
+            <section className="reflection-before" aria-labelledby="reflection-before-heading">
+              <h2 id="reflection-before-heading" className="mb-3 text-xs font-bold uppercase tracking-[.1em] text-[#87918e]">Before you go</h2>
+              <div className="reflection-inputs">
+                <label htmlFor="reflection-went-well">What went well?</label>
+                <textarea id="reflection-went-well" value={reflectionWentWell} onChange={(event) => setReflectionWentWell(event.target.value)} placeholder="A few words about today..." rows={3} />
+                <label htmlFor="reflection-carry-forward">What should carry forward?</label>
+                <textarea id="reflection-carry-forward" value={reflectionCarryForward} onChange={(event) => setReflectionCarryForward(event.target.value)} placeholder="Something for tomorrow..." rows={3} />
+              </div>
+            </section>
+            <div className="reflection-closing"><p>Take what matters with you.</p><button type="button" onClick={() => setReflectionOpen(false)}>Done for today <ArrowUpRight size={15} /></button></div>
           </div>
         </DialogContent>
       </Dialog>
