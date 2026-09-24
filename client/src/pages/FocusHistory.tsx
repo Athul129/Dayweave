@@ -143,8 +143,8 @@ export default function FocusHistory() {
       onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
       onCloseMobileNav={() => setMobileNavOpen(false)}
       onNavigateToday={() => setLocation("/")}
-      onNavigateWeek={() => setLocation("/")}
-      onNavigateNotes={() => setLocation("/")}
+      onNavigateWeek={() => setLocation("/this-week")}
+      onNavigateNotes={() => setLocation("/loose-notes")}
       onNavigateFocusHistory={() => setLocation("/focus-history")}
       onPreferencesClick={() => setPreferencesOpen(true)}
     >
