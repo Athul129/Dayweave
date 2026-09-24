@@ -4,6 +4,7 @@ import { ArrowDownRight, ArrowUpRight, CalendarDays, Check, ChevronLeft, Chevron
 import { createTask as insertTask, deleteTask as removeTask, fetchTasks, updateTask as persistTask, type Energy, type Section, type Task, type TaskDraft } from "@/lib/tasks";
 import { createNote as insertNote, deleteNote as removeNote, fetchNotes, updateNote as persistNote, type Note, type NoteDraft } from "@/lib/notes";
 import { fetchDailyIntention, saveDailyIntention } from "@/lib/intentions";
+import { fetchDailyReflection, saveDailyReflection } from "@/lib/reflections";
 import { createFocusSession, getFocusSessions, type FocusSessionHistory, type FocusSessionHistoryDraft } from "@/lib/focusSessions";
 import { getDefaultTaskMinutes } from "@/lib/preferences";
 import { useAuth } from "@/contexts/AuthContext";
@@ -304,7 +305,7 @@ export default function Home() {
   const intentionKey = userId ? `${userId}:${currentDate}` : ""; const intentionKeyRef = useRef(intentionKey); intentionKeyRef.current = intentionKey;
   const visibleIntention = intentionLoadedKey === intentionKey ? intention : DEFAULT_DAILY_INTENTION;
   const visibleIntentionSaveStatus = intentionLoadedKey === intentionKey && intentionSaveStatus?.key === intentionKey && intentionSaveStatus.editVersion === intentionEditVersion.current ? intentionSaveStatus.status : null;
-  const [view, setView] = useState<"today" | "week" | "notes">(() => viewForPath(location)); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(null); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const previousFocusUserId = useRef(userId); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const toastTimerRef = useRef<number | null>(null); const [preferencesOpen, setPreferencesOpen] = useState(false); const [reflectionOpen, setReflectionOpen] = useState(false); const [reflectionWentWell, setReflectionWentWell] = useState(""); const [reflectionCarryForward, setReflectionCarryForward] = useState("");
+  const [view, setView] = useState<"today" | "week" | "notes">(() => viewForPath(location)); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(null); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const previousFocusUserId = useRef(userId); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const toastTimerRef = useRef<number | null>(null); const [preferencesOpen, setPreferencesOpen] = useState(false); const [reflectionOpen, setReflectionOpen] = useState(false); const [reflectionWentWell, setReflectionWentWell] = useState(""); const [reflectionCarryForward, setReflectionCarryForward] = useState(""); const [reflectionLoading, setReflectionLoading] = useState(false); const [reflectionSaving, setReflectionSaving] = useState(false); const reflectionSaveInFlight = useRef(false); const reflectionDateRef = useRef(currentDate); reflectionDateRef.current = currentDate;
   const [taskModal, setTaskModal] = useState<"create" | "edit" | null>(null); const [formDraft, setFormDraft] = useState<TaskDraft>(() => makeDefaultTaskDraft(localDateString())); const [editingId, setEditingId] = useState<string | null>(null); const [deleteConfirm, setDeleteConfirm] = useState(false); const [taskSavePending, setTaskSavePending] = useState(false); const taskSaveInFlight = useRef(false);
   const [noteModal, setNoteModal] = useState<"create" | "edit" | null>(null); const [noteDraft, setNoteDraft] = useState<NoteDraft>({ title: "", body: "" }); const [editingNoteId, setEditingNoteId] = useState<string | null>(null); const [noteDeleteConfirm, setNoteDeleteConfirm] = useState(false);
   const focusCompletionRef = useRef<string | null>(null);
@@ -373,6 +374,26 @@ export default function Home() {
     });
     return () => { active = false; };
   }, [userId]);
+  useEffect(() => {
+    let active = true;
+    setReflectionWentWell("");
+    setReflectionCarryForward("");
+    setReflectionLoading(Boolean(userId));
+    if (!userId) {
+      setReflectionLoading(false);
+      return () => { active = false; };
+    }
+    void fetchDailyReflection(userId, currentDate).then((reflection) => {
+      if (!active || userIdRef.current !== userId) return;
+      setReflectionWentWell(reflection?.wentWell ?? "");
+      setReflectionCarryForward(reflection?.carryForward ?? "");
+    }).catch(() => {
+      if (active && userIdRef.current === userId) showToast("Your daily reflection could not be loaded. Please try again.");
+    }).finally(() => {
+      if (active) setReflectionLoading(false);
+    });
+    return () => { active = false; };
+  }, [userId, currentDate]);
   useEffect(() => {
     let active = true;
     setNotesLoading(true);
@@ -625,6 +646,27 @@ export default function Home() {
       } catch (error) { showToast(noteErrorMessage("delete", error)); }
     });
   };
+  const saveReflection = async () => {
+    if (!userId || reflectionSaveInFlight.current || reflectionLoading) return;
+    reflectionSaveInFlight.current = true;
+    setReflectionSaving(true);
+    const saveDate = currentDate;
+    const wentWell = reflectionWentWell.trim();
+    const carryForward = reflectionCarryForward.trim();
+    try {
+      const saved = await saveDailyReflection(userId, currentDate, wentWell, carryForward);
+      if (userIdRef.current === userId && reflectionDateRef.current === saveDate) {
+        setReflectionWentWell(saved.wentWell);
+        setReflectionCarryForward(saved.carryForward);
+        setReflectionOpen(false);
+      }
+    } catch {
+      showToast("Your daily reflection could not be saved. Please try again.");
+    } finally {
+      reflectionSaveInFlight.current = false;
+      setReflectionSaving(false);
+    }
+  };
   const startFocus = (requestedTask?: Task) => { if (!userId) { setFocusSession(null); setFocusOpen(false); return; } const task = requestedTask && !requestedTask.done ? requestedTask : tasks.find((item) => !item.done); if (!task) { setFocusSession(null); setFocusOpen(true); return; } setActiveId(task.id); setFocusSession((current) => { const now = Date.now(); if (current?.taskId === task.id && !current.completed) return current.pausedAt !== null ? resumeFocusSession(current, now) : { ...current, isRunning: true, updatedAt: now }; const startAt = localDateTimeTimestamp(task.date, task.time); const endAt = startAt + task.minutes * 60 * 1000; return { sessionId: crypto.randomUUID(), taskId: task.id, durationSeconds: task.minutes * 60, startAt, endAt, pausedAt: null, pausedRemainingSeconds: null, pausedSeconds: 0, isRunning: true, completed: false, updatedAt: now }; }); setFocusOpen(true); };
   const exitFocus = () => { setFocusOpen(false); setFocusSession((current) => current ? pauseFocusSession(current) : null); };
   const completeFocus = async () => { if (!focusSession || focusCompletionRef.current === focusSession.sessionId) return; const completedSession = focusSession; focusCompletionRef.current = completedSession.sessionId; const task = tasksRef.current.find((item) => item.id === completedSession.taskId); const historyDraft: FocusSessionHistoryDraft = { sessionId: completedSession.sessionId, taskId: task?.id ?? null, taskTitle: task?.title ?? "Focus session", taskDate: task?.date ?? null, plannedDurationSeconds: completedSession.durationSeconds, startedAt: new Date(completedSession.startAt).toISOString(), completedAt: new Date().toISOString(), pausedSeconds: completedSession.pausedSeconds }; let historySaved = Boolean(userId); try { if (userId) { await createFocusSession(userId, historyDraft); removePendingFocusHistory(userId, historyDraft.sessionId); } } catch { historySaved = false; if (userId) savePendingFocusHistory(userId, historyDraft); } const taskCompleted = await toggleTask(completedSession.taskId); if (!taskCompleted) { focusCompletionRef.current = null; showToast("Task could not be completed. Please try again."); return; } setFocusOpen(false); setFocusSession(null); showToast(historySaved ? "Task completed" : "Task completed, but Focus History could not be saved."); };
@@ -687,7 +729,7 @@ export default function Home() {
                 <textarea id="reflection-carry-forward" value={reflectionCarryForward} onChange={(event) => setReflectionCarryForward(event.target.value)} placeholder="Something for tomorrow..." rows={3} />
               </div>
             </section>
-            <div className="reflection-closing"><p>Take what matters with you.</p><button type="button" onClick={() => setReflectionOpen(false)}>Done for today <ArrowUpRight size={15} /></button></div>
+            <div className="reflection-closing"><p>Take what matters with you.</p><button type="button" onClick={() => void saveReflection()} disabled={reflectionLoading || reflectionSaving}>{reflectionSaving ? "Saving..." : <>Done for today <ArrowUpRight size={15} /></>}</button></div>
           </div>
         </DialogContent>
       </Dialog>

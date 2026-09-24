@@ -148,6 +148,7 @@ export default function FocusHistory() {
       onNavigateFocusHistory={() => setLocation("/focus-history")}
       onPreferencesClick={() => setPreferencesOpen(true)}
     >
+      <div className="flex min-h-[calc(100dvh-82px)] flex-col items-stretch max-[740px]:min-h-[calc(100dvh-62px)]">
       <section className="notes-hero">
         <div>
           <span className="eyebrow accent">FOCUS HISTORY</span>
@@ -156,7 +157,7 @@ export default function FocusHistory() {
         </div>
       </section>
 
-      <div className="mx-auto mt-6 flex max-w-3xl items-center justify-end">
+      <div className="mx-auto mt-6 flex w-full max-w-3xl items-center justify-end">
         <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[.08em] text-[#87918e]">
           <span>Show</span>
           <select
@@ -173,7 +174,7 @@ export default function FocusHistory() {
       </div>
 
       {!loading && !error && filteredSessions.length > 0 && (
-        <section aria-label="Focus history summary" className="mx-auto mt-7 grid max-w-3xl grid-cols-3 divide-x divide-[#dfe3dc] rounded-xl border border-[#e1e3da] bg-[#fffdf7] px-2 py-4 shadow-[2px_3px_0_#e8e4d9] sm:mt-8 sm:px-5 sm:py-5">
+        <section aria-label="Focus history summary" className="mx-auto mt-7 grid w-full max-w-3xl grid-cols-3 divide-x divide-[#dfe3dc] rounded-xl border border-[#e1e3da] bg-[#fffdf7] px-2 py-4 shadow-[2px_3px_0_#e8e4d9] sm:mt-8 sm:px-5 sm:py-5">
           <div className="min-w-0 px-2 sm:px-4">
             <span className="block text-[9px] font-bold uppercase tracking-[.1em] text-[#87918e] sm:text-[10px]">Completed</span>
             <strong className="mt-1 block break-words font-[Fraunces,serif] text-sm font-semibold leading-tight text-[#1d2d35] sm:text-lg">
@@ -195,7 +196,7 @@ export default function FocusHistory() {
         </section>
       )}
 
-      <div className="mx-auto mt-9 max-w-3xl pb-10 sm:mt-11">
+      <div className="mx-auto mt-9 w-full max-w-3xl pb-10 sm:mt-11">
         {loading ? (
           <p className="rounded-xl border border-[#dfe3dc] bg-[#fffdf7] px-5 py-6 text-sm text-[#647679] shadow-[2px_3px_0_#e8e4d9]" role="status">Loading...</p>
         ) : error ? (
@@ -256,6 +257,7 @@ export default function FocusHistory() {
             ))}
           </div>
         )}
+      </div>
       </div>
       <PreferencesDialog open={preferencesOpen} onOpenChange={setPreferencesOpen} />
     </DayweaveShell>
