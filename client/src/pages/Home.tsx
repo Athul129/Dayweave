@@ -305,7 +305,7 @@ export default function Home() {
   const intentionKey = userId ? `${userId}:${currentDate}` : ""; const intentionKeyRef = useRef(intentionKey); intentionKeyRef.current = intentionKey;
   const visibleIntention = intentionLoadedKey === intentionKey ? intention : DEFAULT_DAILY_INTENTION;
   const visibleIntentionSaveStatus = intentionLoadedKey === intentionKey && intentionSaveStatus?.key === intentionKey && intentionSaveStatus.editVersion === intentionEditVersion.current ? intentionSaveStatus.status : null;
-  const [view, setView] = useState<"today" | "week" | "notes">(() => viewForPath(location)); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(null); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const previousFocusUserId = useRef(userId); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const toastTimerRef = useRef<number | null>(null); const [preferencesOpen, setPreferencesOpen] = useState(false); const [reflectionOpen, setReflectionOpen] = useState(false); const [reflectionWentWell, setReflectionWentWell] = useState(""); const [reflectionCarryForward, setReflectionCarryForward] = useState(""); const [reflectionLoading, setReflectionLoading] = useState(false); const [reflectionSaving, setReflectionSaving] = useState(false); const reflectionSaveInFlight = useRef(false); const reflectionDateRef = useRef(currentDate); reflectionDateRef.current = currentDate; const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false); const [logoutPending, setLogoutPending] = useState(false); const [logoutError, setLogoutError] = useState("");
+  const [view, setView] = useState<"today" | "week" | "notes">(() => viewForPath(location)); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(null); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const previousFocusUserId = useRef(userId); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const toastTimerRef = useRef<number | null>(null); const [preferencesOpen, setPreferencesOpen] = useState(false); const [reflectionOpen, setReflectionOpen] = useState(false); const [reflectionWentWell, setReflectionWentWell] = useState(""); const [reflectionCarryForward, setReflectionCarryForward] = useState(""); const [reflectionLoading, setReflectionLoading] = useState(false); const [reflectionSaving, setReflectionSaving] = useState(false); const reflectionSaveInFlight = useRef(false); const reflectionDateRef = useRef(currentDate); reflectionDateRef.current = currentDate; const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false); const [logoutPending, setLogoutPending] = useState(false); const [logoutError, setLogoutError] = useState(""); const [clearDayOpen, setClearDayOpen] = useState(false); const [clearDayPending, setClearDayPending] = useState(false); const clearDayInFlight = useRef(false);
   const [taskModal, setTaskModal] = useState<"create" | "edit" | null>(null); const [formDraft, setFormDraft] = useState<TaskDraft>(() => makeDefaultTaskDraft(localDateString())); const [editingId, setEditingId] = useState<string | null>(null); const [deleteConfirm, setDeleteConfirm] = useState(false); const [taskSavePending, setTaskSavePending] = useState(false); const taskSaveInFlight = useRef(false);
   const [noteModal, setNoteModal] = useState<"create" | "edit" | null>(null); const [noteDraft, setNoteDraft] = useState<NoteDraft>({ title: "", body: "" }); const [editingNoteId, setEditingNoteId] = useState<string | null>(null); const [noteDeleteConfirm, setNoteDeleteConfirm] = useState(false);
   const focusCompletionRef = useRef<string | null>(null);
@@ -685,6 +685,50 @@ export default function Home() {
       setReflectionSaving(false);
     }
   };
+  const requestClearDay = () => {
+    setMenuOpen(false);
+    const activeSession = focusSessionRef.current;
+    const targets = tasksRef.current.filter((task) => task.date === currentDate && !task.done && activeSession?.taskId !== task.id);
+    if (!targets.length) {
+      showToast("There are no unfinished tasks to clear.");
+      return;
+    }
+    setClearDayOpen(true);
+  };
+  const clearDay = async () => {
+    if (!userId || clearDayInFlight.current) return;
+    const activeSession = focusSessionRef.current;
+    const targetIds = tasksRef.current.filter((task) => task.date === currentDate && !task.done && activeSession?.taskId !== task.id).map((task) => task.id);
+    if (!targetIds.length) {
+      setClearDayOpen(false);
+      showToast("There are no unfinished tasks to clear.");
+      return;
+    }
+    clearDayInFlight.current = true;
+    setClearDayPending(true);
+    let failed = false;
+    await queueTaskMutation(async () => {
+      for (const taskId of targetIds) {
+        if (userIdRef.current !== userId) { failed = true; break; }
+        try {
+          await removeTask(userId, taskId);
+          if (userIdRef.current === userId) {
+            replaceTasks((items) => items.filter((task) => task.id !== taskId));
+            if (activeId === taskId) setActiveId(null);
+          }
+        } catch (error) {
+          failed = true;
+          console.error("[Dayweave] Unable to clear a task.", error);
+        }
+      }
+    });
+    clearDayInFlight.current = false;
+    setClearDayPending(false);
+    if (userIdRef.current === userId) {
+      setClearDayOpen(false);
+      showToast(failed ? "Some unfinished tasks could not be cleared. Please try again." : "Today’s unfinished tasks were cleared.");
+    }
+  };
   const confirmLogout = async () => {
     if (logoutPending) return;
     setLogoutPending(true);
@@ -720,7 +764,7 @@ export default function Home() {
     onNavigateFocusHistory={() => setLocation("/focus-history")}
     onPreferencesClick={() => setPreferencesOpen(true)}
     ariaHidden={focusOpen}
-    topActions={<div className="top-actions"><button className="icon-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="More options"><MoreHorizontal size={19} /></button>{menuOpen && <div className="pop-menu"><button onClick={() => { setMenuOpen(false); showToast("A blank day is a brave start"); }}>Clear the day</button><button onClick={() => { setMenuOpen(false); showToast("Share link copied"); }}>Share view</button></div>}<button className="focus-button" onClick={() => startFocus(selectedTask)}><Play size={15} fill="currentColor" /> Focus mode</button></div>}
+    topActions={<div className="top-actions"><button className="icon-button" onClick={() => setMenuOpen(!menuOpen)} aria-label="More options"><MoreHorizontal size={19} /></button>{menuOpen && <div className="pop-menu"><button onClick={requestClearDay}>Clear the day</button><button onClick={() => { setMenuOpen(false); showToast("Share link copied"); }}>Share view</button></div>}<button className="focus-button" onClick={() => startFocus(selectedTask)}><Play size={15} fill="currentColor" /> Focus mode</button></div>}
     afterMain={<>
       {focusOpen && <FocusMode task={focusTask} session={focusSession} setSession={setFocusSession} onComplete={completeFocus} onExit={exitFocus} onAddTask={() => { setFocusOpen(false); setFocusSession(null); setView("today"); openCreate(); }} onReturnToday={() => { setFocusOpen(false); setFocusSession(null); setView("today"); }} />}
       {taskModal && <div className="modal-backdrop task-modal-backdrop" onClick={() => setTaskModal(null)}><div className="task-form-modal" role="dialog" aria-modal="true" aria-labelledby="task-form-title" onClick={(event) => event.stopPropagation()}><TaskForm mode={taskModal} initial={formDraft} today={currentDate} dateLockedMessage={taskDateLockReason} isSubmitting={taskSavePending} onSave={saveTask} onCancel={() => setTaskModal(null)} onRequestDelete={() => setDeleteConfirm(true)} deleteConfirm={deleteConfirm} onConfirmDelete={deleteTask} onCancelDelete={() => setDeleteConfirm(false)} /></div></div>}
@@ -736,6 +780,18 @@ export default function Home() {
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button type="button" className="secondary-action justify-center" onClick={() => setLogoutConfirmOpen(false)} disabled={logoutPending}>Cancel</button>
             <button type="button" className="primary-action" onClick={() => void confirmLogout()} disabled={logoutPending}>{logoutPending ? "Logging out..." : "Log out"}</button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={clearDayOpen} onOpenChange={(open) => { if (!clearDayPending) setClearDayOpen(open); }}>
+        <DialogContent className="rounded-[16px] border-[#e8e4da] bg-[#fbfaf6] text-[#292d3b] shadow-[0_18px_60px_rgba(30,35,48,0.16)] sm:max-w-md">
+          <DialogHeader className="pr-7 text-left">
+            <DialogTitle>Clear today’s unfinished tasks?</DialogTitle>
+            <DialogDescription>This will remove the incomplete tasks scheduled for today. Completed tasks and your reflection history will stay.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="secondary-action justify-center" onClick={() => setClearDayOpen(false)} disabled={clearDayPending}>Cancel</button>
+            <button type="button" className="primary-action" onClick={() => void clearDay()} disabled={clearDayPending}>{clearDayPending ? "Clearing..." : "Clear tasks"}</button>
           </div>
         </DialogContent>
       </Dialog>
