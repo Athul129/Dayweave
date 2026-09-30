@@ -285,7 +285,7 @@ function FocusMode({ task, session, setSession, onComplete, onExit, onAddTask, o
 }
 
 export default function Home() {
-  const { userId } = useAuth();
+  const { userId, signOut } = useAuth();
   const [location, setLocation] = useLocation();
   const [currentDate, setCurrentDate] = useState(localDateString);
   const [weekOffset, setWeekOffset] = useState(0); const displayedWeekDays = useMemo(() => getWeekDays(addDateDays(currentDate, weekOffset * 7), currentDate), [currentDate, weekOffset]); const weekLabel = formatWeekRange(displayedWeekDays);
@@ -305,11 +305,29 @@ export default function Home() {
   const intentionKey = userId ? `${userId}:${currentDate}` : ""; const intentionKeyRef = useRef(intentionKey); intentionKeyRef.current = intentionKey;
   const visibleIntention = intentionLoadedKey === intentionKey ? intention : DEFAULT_DAILY_INTENTION;
   const visibleIntentionSaveStatus = intentionLoadedKey === intentionKey && intentionSaveStatus?.key === intentionKey && intentionSaveStatus.editVersion === intentionEditVersion.current ? intentionSaveStatus.status : null;
-  const [view, setView] = useState<"today" | "week" | "notes">(() => viewForPath(location)); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(null); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const previousFocusUserId = useRef(userId); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const toastTimerRef = useRef<number | null>(null); const [preferencesOpen, setPreferencesOpen] = useState(false); const [reflectionOpen, setReflectionOpen] = useState(false); const [reflectionWentWell, setReflectionWentWell] = useState(""); const [reflectionCarryForward, setReflectionCarryForward] = useState(""); const [reflectionLoading, setReflectionLoading] = useState(false); const [reflectionSaving, setReflectionSaving] = useState(false); const reflectionSaveInFlight = useRef(false); const reflectionDateRef = useRef(currentDate); reflectionDateRef.current = currentDate;
+  const [view, setView] = useState<"today" | "week" | "notes">(() => viewForPath(location)); const [newTask, setNewTask] = useState(""); const [activeId, setActiveId] = useState<string | null>(null); const [selectedWeekDay, setSelectedWeekDay] = useState(localDateString()); const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null); const [notesSearch, setNotesSearch] = useState(""); const [focusSession, setFocusSession] = useState<FocusSession | null>(null); const focusSessionRef = useRef(focusSession); focusSessionRef.current = focusSession; const previousFocusUserId = useRef(userId); const [focusOpen, setFocusOpen] = useState(false); const [mobileNavOpen, setMobileNavOpen] = useState(false); const [menuOpen, setMenuOpen] = useState(false); const [toast, setToast] = useState(""); const toastTimerRef = useRef<number | null>(null); const [preferencesOpen, setPreferencesOpen] = useState(false); const [reflectionOpen, setReflectionOpen] = useState(false); const [reflectionWentWell, setReflectionWentWell] = useState(""); const [reflectionCarryForward, setReflectionCarryForward] = useState(""); const [reflectionLoading, setReflectionLoading] = useState(false); const [reflectionSaving, setReflectionSaving] = useState(false); const reflectionSaveInFlight = useRef(false); const reflectionDateRef = useRef(currentDate); reflectionDateRef.current = currentDate; const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false); const [logoutPending, setLogoutPending] = useState(false); const [logoutError, setLogoutError] = useState("");
   const [taskModal, setTaskModal] = useState<"create" | "edit" | null>(null); const [formDraft, setFormDraft] = useState<TaskDraft>(() => makeDefaultTaskDraft(localDateString())); const [editingId, setEditingId] = useState<string | null>(null); const [deleteConfirm, setDeleteConfirm] = useState(false); const [taskSavePending, setTaskSavePending] = useState(false); const taskSaveInFlight = useRef(false);
   const [noteModal, setNoteModal] = useState<"create" | "edit" | null>(null); const [noteDraft, setNoteDraft] = useState<NoteDraft>({ title: "", body: "" }); const [editingNoteId, setEditingNoteId] = useState<string | null>(null); const [noteDeleteConfirm, setNoteDeleteConfirm] = useState(false);
   const focusCompletionRef = useRef<string | null>(null);
   useEffect(() => { return () => { if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current); toastTimerRef.current = null; }; }, []); useEffect(() => { setMenuOpen(false); }, [view]); useEffect(() => { setView(viewForPath(location)); }, [location]);
+  useEffect(() => {
+    if (location !== "/" || !userId) {
+      setLogoutConfirmOpen(false);
+      setLogoutError("");
+      return;
+    }
+    const guardState = { dayweaveHomeBackGuard: true };
+    if (!(window.history.state as { dayweaveHomeBackGuard?: boolean } | null)?.dayweaveHomeBackGuard) {
+      window.history.pushState(guardState, "", "/");
+    }
+    const handlePopState = () => {
+      window.history.pushState(guardState, "", "/");
+      setLogoutError("");
+      setLogoutConfirmOpen(true);
+    };
+    window.addEventListener("popstate", handlePopState, true);
+    return () => window.removeEventListener("popstate", handlePopState, true);
+  }, [location, userId]);
   useEffect(() => {
     if (!menuOpen) return;
     const closeOnOutsidePointer = (event: PointerEvent) => { if (!(event.target as Element | null)?.closest(".top-actions")) setMenuOpen(false); };
@@ -667,6 +685,20 @@ export default function Home() {
       setReflectionSaving(false);
     }
   };
+  const confirmLogout = async () => {
+    if (logoutPending) return;
+    setLogoutPending(true);
+    setLogoutError("");
+    const result = await signOut();
+    if (result.error) {
+      console.error("[Dayweave] Unable to sign out.", result.error);
+      setLogoutError("Unable to sign out. Please try again.");
+      setLogoutPending(false);
+      return;
+    }
+    setLogoutPending(false);
+    setLogoutConfirmOpen(false);
+  };
   const startFocus = (requestedTask?: Task) => { if (!userId) { setFocusSession(null); setFocusOpen(false); return; } const task = requestedTask && !requestedTask.done ? requestedTask : tasks.find((item) => !item.done); if (!task) { setFocusSession(null); setFocusOpen(true); return; } setActiveId(task.id); setFocusSession((current) => { const now = Date.now(); if (current?.taskId === task.id && !current.completed) return current.pausedAt !== null ? resumeFocusSession(current, now) : { ...current, isRunning: true, updatedAt: now }; const startAt = localDateTimeTimestamp(task.date, task.time); const endAt = startAt + task.minutes * 60 * 1000; return { sessionId: crypto.randomUUID(), taskId: task.id, durationSeconds: task.minutes * 60, startAt, endAt, pausedAt: null, pausedRemainingSeconds: null, pausedSeconds: 0, isRunning: true, completed: false, updatedAt: now }; }); setFocusOpen(true); };
   const exitFocus = () => { setFocusOpen(false); setFocusSession((current) => current ? pauseFocusSession(current) : null); };
   const completeFocus = async () => { if (!focusSession || focusCompletionRef.current === focusSession.sessionId) return; const completedSession = focusSession; focusCompletionRef.current = completedSession.sessionId; const task = tasksRef.current.find((item) => item.id === completedSession.taskId); const historyDraft: FocusSessionHistoryDraft = { sessionId: completedSession.sessionId, taskId: task?.id ?? null, taskTitle: task?.title ?? "Focus session", taskDate: task?.date ?? null, plannedDurationSeconds: completedSession.durationSeconds, startedAt: new Date(completedSession.startAt).toISOString(), completedAt: new Date().toISOString(), pausedSeconds: completedSession.pausedSeconds }; let historySaved = Boolean(userId); try { if (userId) { await createFocusSession(userId, historyDraft); removePendingFocusHistory(userId, historyDraft.sessionId); } } catch { historySaved = false; if (userId) savePendingFocusHistory(userId, historyDraft); } const taskCompleted = await toggleTask(completedSession.taskId); if (!taskCompleted) { focusCompletionRef.current = null; showToast("Task could not be completed. Please try again."); return; } setFocusOpen(false); setFocusSession(null); showToast(historySaved ? "Task completed" : "Task completed, but Focus History could not be saved."); };
@@ -695,6 +727,18 @@ export default function Home() {
       {noteModal && <div className="modal-backdrop task-modal-backdrop" onClick={() => setNoteModal(null)}><div className="task-form-modal note-form-modal" role="dialog" aria-modal="true" aria-labelledby="note-form-title" onClick={(event) => event.stopPropagation()}><NoteForm mode={noteModal} initial={noteDraft} onSave={saveNote} onCancel={() => setNoteModal(null)} onRequestDelete={() => setNoteDeleteConfirm(true)} deleteConfirm={noteDeleteConfirm} onConfirmDelete={deleteNote} onCancelDelete={() => setNoteDeleteConfirm(false)} /></div></div>}
       {toast && <div className="toast" role="status" aria-live="polite"><Check size={16} /> {toast}</div>}
       <PreferencesDialog open={preferencesOpen} onOpenChange={setPreferencesOpen} />
+      <Dialog open={logoutConfirmOpen} onOpenChange={(open) => { if (!logoutPending) setLogoutConfirmOpen(open); }}>
+        <DialogContent className="rounded-[16px] border-[#e8e4da] bg-[#fbfaf6] text-[#292d3b] shadow-[0_18px_60px_rgba(30,35,48,0.16)] sm:max-w-md">
+          <DialogHeader className="pr-7 text-left">
+            <DialogTitle>Are you sure you want to log out?</DialogTitle>
+            <DialogDescription>{logoutError || "You can sign back in whenever you’re ready."}</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="secondary-action justify-center" onClick={() => setLogoutConfirmOpen(false)} disabled={logoutPending}>Cancel</button>
+            <button type="button" className="primary-action" onClick={() => void confirmLogout()} disabled={logoutPending}>{logoutPending ? "Logging out..." : "Log out"}</button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={reflectionOpen} onOpenChange={setReflectionOpen}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[20px] border-[#e8e4da] bg-[#fbfaf6] p-6 text-[#292d3b] shadow-[0_18px_60px_rgba(30,35,48,0.16)] sm:max-w-lg sm:p-8">
           <DialogHeader className="gap-2 pr-7 text-left">
