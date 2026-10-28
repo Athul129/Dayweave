@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { CalendarDays, ChevronRight, Compass, Inbox, LayoutDashboard, Menu, SunMedium, Timer } from "lucide-react";
+import { CalendarDays, ChevronRight, Cloud, CloudDrizzle, CloudRain, CloudSun, Compass, Inbox, LayoutDashboard, Menu, Moon, Sun, SunMedium, Timer, Umbrella } from "lucide-react";
+import { useWeather } from "@/hooks/useWeather";
 import AuthAccountControl from "@/components/AuthAccountControl";
 
 export type DayweaveSection = "today" | "week" | "notes" | "focus-history";
@@ -47,6 +48,7 @@ export default function DayweaveShell({
   afterMain,
   ariaHidden,
 }: DayweaveShellProps) {
+  const weather = useWeather();
   const mobileNavRef = useRef<HTMLElement | null>(null);
   const [mobileNavHasMoreRight, setMobileNavHasMoreRight] = useState(false);
 
@@ -78,6 +80,22 @@ export default function DayweaveShell({
     onCloseMobileNav();
   };
 
+  const weatherView = (() => {
+    if (weather.status === "loading") return { label: "WEATHER", text: "Finding the sky...", icon: SunMedium };
+    if (!weather.data) return { label: "WEATHER UNAVAILABLE", text: "Location not available", icon: Cloud };
+    const { code, isDay, temperature } = weather.data;
+    const temp = `${Math.round(temperature)}°`;
+    if (code === 0) return { label: isDay ? "CLEAR OUTSIDE" : "CLEAR TONIGHT", text: `${temp} · ${isDay ? "bright and calm" : "clear skies"}`, icon: isDay ? Sun : Moon };
+    if ([1, 2, 3].includes(code)) return { label: "PARTLY CLOUDY", text: `${temp} · changing skies`, icon: CloudSun };
+    if ([45, 48].includes(code)) return { label: "MISTY OUTSIDE", text: `${temp} · misty`, icon: Cloud };
+    if ([51, 53, 55, 56, 57].includes(code)) return { label: "LIGHT DRIZZLE", text: `${temp} · light drizzle`, icon: CloudDrizzle };
+    if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return { label: "RAINING OUTSIDE", text: `${temp} · rain nearby`, icon: CloudRain };
+    if ([71, 73, 75, 77, 85, 86].includes(code)) return { label: "SNOWING OUTSIDE", text: `${temp} · snow nearby`, icon: Umbrella };
+    if ([95, 96, 99].includes(code)) return { label: "STORMY OUTSIDE", text: `${temp} · unsettled skies`, icon: CloudRain };
+    return { label: "WEATHER", text: `${temp} · changing skies`, icon: Cloud };
+  })();
+  const WeatherIcon = weatherView.icon;
+
   return (
     <div className="app-shell">
       <aside className="side-rail" aria-hidden={ariaHidden ? "true" : undefined}>
@@ -90,7 +108,7 @@ export default function DayweaveShell({
           <button className={`rail-link ${activeSection === "focus-history" ? "active" : ""}`} onClick={onNavigateFocusHistory}><Timer size={17} /> Focus History</button>
         </nav>
         <div className="rail-bottom">
-          <div className="weather-chip"><SunMedium size={19} /><div><span>LIGHT OUTSIDE</span><strong>18° · soft morning</strong></div></div>
+          <div className="weather-chip" aria-live="polite"><WeatherIcon size={19} aria-hidden="true" /><div><span>{weatherView.label}</span><strong>{weatherView.text}</strong></div></div>
           <button className="rail-link subtle" onClick={onPreferencesClick}><Compass size={17} /> Preferences</button>
           <AuthAccountControl section={activeSection} />
         </div>
