@@ -1,67 +1,18 @@
 import { getSupabaseClient } from "@/lib/supabase";
 
-export type Note = {
-  id: string;
-  title: string;
-  body: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
+export type NoteAttachment = { id: string; storagePath: string; mediaType: "image" | "video"; mimeType: string; fileSize: number; durationSeconds: number | null; url: string };
+export type Note = { id: string; title: string; body: string; createdAt: string; updatedAt: string; attachments: NoteAttachment[] };
 export type NoteDraft = Pick<Note, "title" | "body">;
-
-function mapNote(row: { id: string; title: string; body: string; created_at: string; updated_at: string }): Note {
-  return {
-    id: String(row.id),
-    title: row.title,
-    body: row.body,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+function mapNote(row: { id: string; title: string; body: string; created_at: string; updated_at: string }, attachments: NoteAttachment[] = []): Note { const note = { id: String(row.id), title: row.title, body: row.body, createdAt: row.created_at, updatedAt: row.updated_at } as Note; if (attachments.length) note.attachments = attachments; return note; }
+async function attachmentsFor(noteId: string, userId: string): Promise<NoteAttachment[]> {
+  const client = getSupabaseClient();
+  if (!(client as any).storage) return [];
+  const { data, error } = await client.from("note_attachments").select("*").eq("note_id", noteId).eq("user_id", userId).order("created_at"); if (error) throw error;
+  return Promise.all((data ?? []).map(async (row) => { const { data: signed, error: signError } = await client.storage.from("note-media").createSignedUrl(row.storage_path, 3600); if (signError) throw signError; return { id: row.id, storagePath: row.storage_path, mediaType: row.media_type, mimeType: row.mime_type, fileSize: row.file_size, durationSeconds: row.duration_seconds, url: signed.signedUrl } as NoteAttachment; }));
 }
-
-/** Reads are scoped to the current auth user; database RLS remains authoritative. */
-export async function fetchNotes(userId: string): Promise<Note[]> {
-  const { data, error } = await getSupabaseClient()
-    .from("notes")
-    .select("*")
-    .eq("user_id", userId)
-    .order("updated_at", { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []).map(mapNote);
-}
-
-export async function createNote(userId: string, draft: NoteDraft): Promise<Note> {
-  const { data, error } = await getSupabaseClient()
-    .from("notes")
-    .insert({ ...draft, user_id: userId })
-    .select("*")
-    .single();
-
-  if (error) throw error;
-  return mapNote(data);
-}
-
-export async function updateNote(userId: string, id: string, changes: NoteDraft): Promise<Note> {
-  const { data, error } = await getSupabaseClient()
-    .from("notes")
-    .update({ ...changes, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", userId)
-    .select("*")
-    .single();
-
-  if (error) throw error;
-  return mapNote(data);
-}
-
-export async function deleteNote(userId: string, id: string): Promise<void> {
-  const { error } = await getSupabaseClient()
-    .from("notes")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", userId);
-
-  if (error) throw error;
-}
+export async function fetchNotes(userId: string): Promise<Note[]> { const { data, error } = await getSupabaseClient().from("notes").select("*").eq("user_id", userId).order("updated_at", { ascending: false }); if (error) throw error; return Promise.all((data ?? []).map(async (row) => mapNote(row, await attachmentsFor(row.id, userId)))); }
+export async function createNote(userId: string, draft: NoteDraft): Promise<Note> { const { data, error } = await getSupabaseClient().from("notes").insert({ ...draft, user_id: userId }).select("*").single(); if (error) throw error; return mapNote(data); }
+export async function updateNote(userId: string, id: string, changes: NoteDraft): Promise<Note> { const { data, error } = await getSupabaseClient().from("notes").update({ ...changes, updated_at: new Date().toISOString() }).eq("id", id).eq("user_id", userId).select("*").single(); if (error) throw error; return mapNote(data, await attachmentsFor(data.id, userId)); }
+export async function uploadNoteAttachments(userId: string, noteId: string, files: Array<{ file: File; mediaType: "image" | "video"; durationSeconds: number | null }>): Promise<void> { const client = getSupabaseClient(); const uploaded: string[] = []; try { for (const item of files) { const extension = item.file.name.split(".").pop()?.toLowerCase() || "bin"; const attachmentId = crypto.randomUUID(); const storagePath = `${userId}/${noteId}/${attachmentId}.${extension}`; const { error: uploadError } = await client.storage.from("note-media").upload(storagePath, item.file, { contentType: item.file.type, upsert: false }); if (uploadError) throw uploadError; uploaded.push(storagePath); const { error: metadataError } = await client.from("note_attachments").insert({ id: attachmentId, note_id: noteId, user_id: userId, storage_path: storagePath, media_type: item.mediaType, mime_type: item.file.type, file_size: item.file.size, duration_seconds: item.durationSeconds }); if (metadataError) throw metadataError; } } catch (error) { if (uploaded.length) await client.storage.from("note-media").remove(uploaded); throw error; } }
+export async function deleteNoteAttachment(userId: string, attachment: NoteAttachment): Promise<void> { const client = getSupabaseClient(); const { error: storageError } = await client.storage.from("note-media").remove([attachment.storagePath]); if (storageError) throw storageError; const { error } = await client.from("note_attachments").delete().eq("id", attachment.id).eq("user_id", userId); if (error) throw error; }
+export async function deleteNote(userId: string, id: string): Promise<void> { const client = getSupabaseClient(); if (!(client as any).storage) { const { error } = await client.from("notes").delete().eq("id", id).eq("user_id", userId); if (error) throw error; return; } const { data, error: listError } = await client.from("note_attachments").select("id,storage_path").eq("note_id", id).eq("user_id", userId); if (listError) throw listError; if (data?.length) { const { error: removeError } = await client.storage.from("note-media").remove(data.map((row) => row.storage_path)); if (removeError) throw removeError; const { error: attachmentError } = await client.from("note_attachments").delete().eq("note_id", id).eq("user_id", userId); if (attachmentError) throw attachmentError; } const { error: noteError } = await client.from("notes").delete().eq("id", id).eq("user_id", userId); if (noteError) throw noteError; }
