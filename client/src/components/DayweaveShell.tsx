@@ -129,6 +129,7 @@ export default function DayweaveShell({
           <button onClick={() => navigateFromMobile(onPreferencesClick)}><Compass size={16} /> Preferences</button>
           </nav>
         </div>}
+        <div className="mobile-weather-chip" aria-live="polite"><WeatherIcon size={18} aria-hidden="true" /><div><span>{weatherView.label}</span><strong>{weatherView.text}</strong></div></div>
         {children}
       </main>
       {afterMain}
